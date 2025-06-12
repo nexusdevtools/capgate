@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: CapGate CLI",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "cli.cli",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": []
+        }
+    ]
+}

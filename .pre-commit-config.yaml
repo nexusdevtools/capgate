@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.3.0  # Latest as of now
+    hooks:
+      - id: black
+
+  - repo: https://gitlab.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets-hook

@@ -1,0 +1,15 @@
+# config/interfaces.yaml
+
+interfaces:
+  wlan0:
+    type: wifi
+    monitor_mode: true
+    description: "Primary Wi-Fi adapter"
+  eth0:
+    type: ethernet
+    monitor_mode: false
+    description: "Wired adapter"
+  wlan1:
+    type: wifi
+    monitor_mode: true
+    description: "USB Wi-Fi Adapter (external)"

@@ -1,0 +1,15 @@
+app:
+  name: CapGate
+  version: 1.0.0
+  log_level: VERBOSE
+  log_to_file: true
+  plugin_autoload: true
+
+paths:
+  logs: logs/
+  plugins: src/plugins/
+  plugin_template: src/plugin_template/
+
+runner:
+  interface_required: true
+  default_plugin: example_plugin

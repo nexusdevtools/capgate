@@ -1,0 +1,7 @@
+{
+  "name": "${plugin_name}",
+  "version": "0.1.0",
+  "author": "${author}",
+  "description": "Auto-generated plugin for CapGate.",
+  "created_at": "${created_at}"
+}
