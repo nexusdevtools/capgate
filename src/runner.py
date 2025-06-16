@@ -1,12 +1,14 @@
+# runner.py
+
 import sys
 from typing import Optional, List
 
 from core.logger import logger
 from core.plugin_loader import PluginLoader
 from core.context import AppContext
-from core.interface_manager import InterfaceManager
-
+from core.interface_manager import InterfaceManager, InterfaceInfo
 from paths import ensure_directories
+
 ensure_directories()
 
 
@@ -16,16 +18,17 @@ class CapGateRunner:
     managing context, and executing plugins or workflows.
     """
 
-    def __init__(self, context: Optional[AppContext] = None):
+    def __init__(self, context: Optional[AppContext] = None, cli_state: Optional[dict] = None):
         self.context = context or AppContext()
         self.plugin_loader = PluginLoader()
         self.interface_manager = InterfaceManager()
         self.logger = logger
+        self.cli_state = cli_state or {}
         self._initialize_context()
 
     def _initialize_context(self):
         """
-        Initialize the application context with interfaces and other necessary data.
+        Initialize the application context with all available interfaces.
         """
         interfaces = self.interface_manager.get_interfaces()
         self.context.set("interfaces", interfaces)
@@ -48,6 +51,9 @@ class CapGateRunner:
             self.logger.info(f" - {name} v{version} by {author}: {desc}")
 
     def run_plugin(self, name: str, *args, **kwargs):
+        """
+        Executes a given plugin by name, passing context and arguments.
+        """
         if name not in self.plugin_loader.plugins:
             self.logger.error(f"Plugin '{name}' not found.")
             return None
@@ -59,21 +65,32 @@ class CapGateRunner:
         except Exception as e:
             self.logger.error(f"Plugin '{name}' execution failed: {e}")
             return None
-    
-    def get_interfaces(self, wireless_only: bool = False, monitor_only: bool = False) -> List[str]:
+
+    def get_interfaces(
+        self,
+        wireless_only: bool = False,
+        monitor_only: bool = False,
+        is_up_only: bool = False
+    ) -> List[InterfaceInfo]:
         """
-        Return filtered list of interfaces based on flags.
+        Return a filtered list of InterfaceInfo objects.
         """
-        interfaces = self.context.get("interfaces", [])
+        interfaces: List[InterfaceInfo] = self.context.get("interfaces", [])
+
         if wireless_only:
             interfaces = [iface for iface in interfaces if iface.is_wireless]
+
         if monitor_only:
-            interfaces = [iface for iface in interfaces if iface.supports_monitor]
-        return [iface.name for iface in interfaces]
+            interfaces = [iface for iface in interfaces if iface.supports_monitor_mode()]
+
+        if is_up_only:
+            interfaces = [iface for iface in interfaces if iface.is_up]
+
+        return interfaces
 
     def run(self, plugin_name: Optional[str] = None, *args, **kwargs):
         """
-        Entrypoint for the runner. Executes default flow or a plugin.
+        Entrypoint to execute a plugin or default flow.
         """
         self.logger.info("🚀 CapGate Runner Initialized")
 
@@ -84,13 +101,46 @@ class CapGateRunner:
             self.logger.info("No plugin specified. Listing available plugins...\n")
             self.list_plugins()
             self.logger.info("Use 'capgate run <plugin_name>' to execute a specific plugin.")
+
         self.logger.info("🛑 CapGate Runner Finished")
         return False
-        # Note: In a real-world scenario, you might want to handle the exit more gracefully.
-        # For example, you might want to clean up resources or log the exit status.
-        # return False is a hard exit and should be used with caution.
-        # In this case, it's used to indicate that the script has finished executing.
-        # You might want to consider using a more graceful shutdown process in a production environment.
-        # For example, you could use a signal handler to catch termination signals and clean up before exiting.
-        # This would allow you to close any open files, release resources, or perform any other necessary cleanup.
-        # However, for the sake of simplicity and clarity in this example, we're using return False.
+    
+    def load_discovery(self, path: str = None) -> dict:
+        """
+        Load discovery JSON topology data.
+        Falls back to default paths if path not specified.
+        """
+        default_paths = [
+            Path("data/topology/discovery.json"),
+            Path("capgate/data/topology/discovery.json"),
+            Path("src/data/topology/discovery.json"),
+            Path("/home/nexus/capgate/data/topology/discovery.json"),
+        ]
+        if path:
+            p = Path(path)
+            if p.exists():
+                with p.open("r") as f:
+                    return json.load(f)
+            else:
+                self.logger.error(f"Discovery file not found: {path}")
+                return {}
+        else:
+            for p in default_paths:
+                if p.exists():
+                    with p.open("r") as f:
+                        return json.load(f)
+            self.logger.error("No discovery.json found in default locations.")
+            return {}
+
+def main():
+    """
+    Main entrypoint for the CapGate Runner.
+    Initializes the runner and processes command line arguments.
+    """
+    try:
+        ensure_directories()
+        runner = CapGateRunner()
+        runner.run(*sys.argv[1:])
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        sys.exit(1)

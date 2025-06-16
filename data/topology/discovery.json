@@ -1,0 +1,4 @@
+{
+  "nodes": [{"id": "ap1", "label": "Access Point 1"}, {"id": "client1", "label": "Client A"}],
+  "edges": [{"source": "ap1", "target": "client1"}]
+}
