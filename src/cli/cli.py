@@ -7,13 +7,20 @@ from rich.console import Console
 from rich.table import Table
 
 from cli import graph  # your updated graph.py
+from cli.boot import boot_sequence
 from core.plugin_creator import create_plugin
 from core.plugin_loader import PluginLoader
 from core.interface_manager import InterfaceInfo
 from runner import CapGateRunner
 from paths import ensure_directories
 
-app = typer.Typer(help="CapGate - Modular Network Toolkit", rich_markup_mode="markdown")
+app = typer.Typer(
+    help="""CapGate — Wireless Network Intelligence Toolkit
+⚡ The network that maps itself.
+""",
+    invoke_without_command=True
+)
+
 console = Console()
 cli_state = {}
 
@@ -24,11 +31,25 @@ app.add_typer(graph.app, name="graph")
 def main_callback(ctx: typer.Context,
                   mock_dev: bool = typer.Option(False, "--mock", help="Enable mock mode"),
                   auto: bool = typer.Option(False, "--auto", help="Auto-select plugin options")):
+    """
+    Main CLI entrypoint. Initializes CLI state and optionally displays the animated boot.
+    """
     cli_state["mock_mode"] = mock_dev
     cli_state["auto_select"] = auto
 
     if ctx.invoked_subcommand is None:
-        console.print("\n[bold cyan]CapGate CLI initialized.[/bold cyan] Use '--help' to explore commands.")
+        # Show animated CapGate intro
+        boot_sequence()
+
+@app.command()
+def boot():
+    """Launch the animated CapGate boot sequence."""
+    boot_sequence()
+
+@app.command()
+def version():
+    """Display the current version of CapGate."""
+    typer.echo("CapGate v0.1.0")
 
 @app.command()
 def interfaces(wireless_only: bool = typer.Option(False, "--wireless", "-w"),

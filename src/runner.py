@@ -1,7 +1,7 @@
 # runner.py
 
 import sys
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from core.logger import logger
 from core.plugin_loader import PluginLoader
@@ -50,7 +50,7 @@ class CapGateRunner:
             version = plugin.metadata.get("version", "0.0")
             self.logger.info(f" - {name} v{version} by {author}: {desc}")
 
-    def run_plugin(self, name: str, *args, **kwargs):
+    def run_plugin(self, name: str, *args: Any, **kwargs: Any):
         """
         Executes a given plugin by name, passing context and arguments.
         """
