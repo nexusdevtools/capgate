@@ -1,4 +1,4 @@
-# /home/nexus/dev/projects/capgate/src/capgate/plugins/wifi_crack_automation/main.py
+# /home/nexus/capgate/src/plugins/wifi_crack_automation/main.py
 
 import json
 from typing import Optional
