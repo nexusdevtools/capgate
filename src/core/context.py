@@ -10,7 +10,7 @@ Accessible by plugins and core components alike.
     - Automatically detects and stores available interfaces on initialization.
     - All core components and plugins can import and modify shared state like this:
 
-        from capgate.core.context import AppContext
+        from core.context import AppContext
 
         ctx = AppContext()
         ctx.set("interfaces", ["wlan0", "wlan1"])

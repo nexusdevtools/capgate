@@ -1,0 +1,63 @@
+{
+  "name": "wifi_crack_automation",
+  "version": "1.0.0",
+  "description": "Automates the process of capturing and cracking WPA/WPA2 handshakes.",
+  "author": "Your Name",
+  "phases": [
+    "phase1_select_interface",
+    "phase2_scan_networks",
+    "phase3_capture_handshake",
+    "phase4_crack_handshake"
+  ],
+  "dependencies": {
+    "capgate": ">=1.0.0"
+  },
+  "scripts": {
+    "start": "capgate start wifi_crack_automation"
+  },
+  "capgate": {
+    "pluginType": "automation",
+    "category": "networking",
+    "icon": "wifi",
+    "ui": {
+      "mainView": "views/main.html",
+      "settingsView": "views/settings.html"
+    }
+  },
+  "capabilities": [
+    "wifi_scan",
+    "handshake_capture",
+    "handshake_crack"
+  ],
+  "config": {
+    "defaultInterface": "wlan0",
+    "crackMethod": "dictionary",
+    "dictionaryPath": "/path/to/dictionary.txt"
+  },
+  "uiComponents": {
+    "networkList": {
+      "type": "table",
+      "columns": ["SSID", "BSSID", "Signal Strength", "Encryption"]
+    },
+    "captureButton": {
+      "type": "button",
+      "label": "Capture Handshake"
+    },
+    "crackButton": {
+      "type": "button",
+      "label": "Crack Handshake"
+    }
+  },
+  "license": "MIT",
+  "repository": "https://github.com/yourusername/wifi_crack_automation",
+  "keywords": [
+    "wifi",
+    "automation",
+    "handshake",
+    "crack",
+    "networking"
+  ],
+  "bugs": {
+    "url": "https://github.com/yourusername/wifi_crack_automation/issues"
+  }
+}

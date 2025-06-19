@@ -1,0 +1,24 @@
+capgate/
+└── plugins/
+    └── wifi_crack_automation/
+        ├── __init__.py
+        ├── main.py                      # Entry point that ties all phases together
+        ├── metadata.json
+        ├── README.md
+
+        ├── phases/
+        │   ├── __init__.py
+        │   ├── phase1_interface.py      # Setup interface and enable monitor mode
+        │   ├── phase2_scan.py           # Scan for networks and parse
+        │   ├── phase3_capture.py        # Capture handshakes, deauth clients
+        │   ├── phase4_crack.py          # Crack WPA2 using captured .cap files
+
+        ├── utils/
+        │   ├── __init__.py
+        │   ├── commands.py              # Wrapper for subprocess calls
+        │   ├── parsers.py               # Parsing airodump-ng or other output
+        │   └── constants.py             # Shared config/constants
+
+        └── state/
+            ├── __init__.py
+            └── context.py               # Shared state across phases
