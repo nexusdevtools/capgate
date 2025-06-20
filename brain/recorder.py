@@ -4,7 +4,7 @@ import json
 import os
 import time
 from typing import Optional, List
-from types.core.context_types import EventLogEntry
+from capgate_types.core.context_types import EventLogEntry
 from core.context import AppContext
 from core.logger import logger
 

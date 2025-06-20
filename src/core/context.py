@@ -22,8 +22,8 @@ from threading import Lock
 from typing import Any, Dict, Optional, List
 import time
 
-from types.db.schemas.device_types import DeviceSchema
-from types.core.context_types import (
+from capgate_types.db.schemas.device_types import DeviceSchema
+from capgate_types.core.context_types import (
     InterfaceData,
     CredentialData,
     MetadataEntry,

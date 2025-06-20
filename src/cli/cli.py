@@ -10,7 +10,6 @@ from cli import graph  # your updated graph.py
 from cli.boot import boot_sequence
 from core.plugin_creator import create_plugin
 from core.plugin_loader import PluginLoader
-from core.interface_manager import InterfaceInfo
 from runner import CapGateRunner
 from paths import ensure_directories
 
@@ -23,7 +22,7 @@ app = typer.Typer(
 
 console = Console()
 cli_state = {}
-
+# Global CLI state dictionary to hold options like mock mode and auto-select
 # Register graph subcommand here
 app.add_typer(graph.app, name="graph")
 
