@@ -3,10 +3,11 @@
 import json
 import os
 import networkx as nx
-from rich import print
 from rich.console import Console
 from rich.tree import Tree
 import matplotlib.pyplot as plt
+
+from core.context import AppContext
 
 class TopologyGraph:
     def __init__(self, json_file: str):
@@ -47,3 +48,28 @@ class TopologyGraph:
     def launch_tui(self):
         # Placeholder for future textual/urwid implementation
         self.console.print("[yellow]TUI mode not yet implemented — coming soon!")
+
+
+    @classmethod
+    def build_from_context(cls) -> "TopologyGraph":
+        ctx = AppContext()
+        graph_data = {"nodes": [], "edges": []}
+
+        # Convert devices into nodes
+        for mac, dev in ctx.devices.items():
+            graph_data["nodes"].append({"id": mac, "label": dev.get("label", mac)})
+
+        # Add known edges (fake for now — can be learned later)
+        for mac in ctx.devices:
+            if ctx.interfaces:
+                ap_id = list(ctx.interfaces.keys())[0]
+                graph_data["edges"].append({"source": ap_id, "target": mac})
+
+        # Save to discovery path (optional, for dev inspection)
+        os.makedirs("data/topology", exist_ok=True)
+        with open("data/topology/discovery.json", "w") as f:
+            json.dump(graph_data, f, indent=2)
+
+        # Return initialized instance
+        return cls("data/topology/discovery.json")
+

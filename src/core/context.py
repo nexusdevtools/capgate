@@ -1,8 +1,8 @@
-"""
-context.py — Central context object for CapGate
-Provides a shared space to store configuration, state, and service references.
-Accessible by plugins and core components alike.
+# capgate/core/context.py — Central context object for CapGate
+# Provides a shared space to store configuration, state, and service references.
+# Accessible by plugins and core components alike.
 
+"""
 ✅ Highlights:
 
     - Thread-safe singleton pattern (_lock) ensures only one instance exists.
@@ -19,15 +19,20 @@ Accessible by plugins and core components alike.
 """
 
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional, List
 import time
+
+from types.db.schemas.device_types import DeviceSchema
+from types.core.context_types import (
+    InterfaceData,
+    CredentialData,
+    MetadataEntry,
+    EventLogEntry,
+)
 
 from core.interface_manager import InterfaceManager
 from core.logger import logger
 
-# Optionally import your typed schemas if available:
-# from db.schemas.interface import Interface
-# from db.schemas.device import Device
 
 class AppContext:
     _instance: Optional["AppContext"] = None
@@ -43,13 +48,12 @@ class AppContext:
 
     def _init_context(self):
         self._store: Dict[str, Any] = {}
-        self.interfaces: Dict[str, Any] = {}    # Use Interface if typed
-        self.devices: Dict[str, Any] = {}       # Use Device if typed
-        self.credentials: Dict[str, dict] = {}
-        self.metadata: Dict[str, dict] = {}
-        self.event_log: List[dict] = []
+        self.interfaces: Dict[str, InterfaceData] = {}
+        self.devices: Dict[str, DeviceSchema] = {}
+        self.credentials: Dict[str, CredentialData] = {}
+        self.metadata: Dict[str, MetadataEntry] = {}
+        self.event_log: List[EventLogEntry] = []
 
-        # Auto-discover interfaces
         interface_manager = InterfaceManager()
         self.interfaces = interface_manager.get_interfaces()
         self.set("interfaces", self.interfaces)
@@ -84,9 +88,6 @@ class AppContext:
         self.event_log.clear()
 
     def update(self, type: str, id: str, data: dict):
-        """
-        Updates internal mappings and logs the event.
-        """
         if type == "interface":
             self.interfaces[id] = data
         elif type == "device":
@@ -101,7 +102,7 @@ class AppContext:
         self._log_event(type, id, data)
 
     def _log_event(self, type: str, id: str, data: dict):
-        event = {
+        event: EventLogEntry = {
             "timestamp": time.time(),
             "type": type,
             "id": id,
