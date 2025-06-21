@@ -1,7 +1,7 @@
 # cli.py — Entry point for CapGate CLI
 
 
-from typing import List
+from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -110,16 +110,22 @@ def plugins():
         )
     console.print(table)
 
-@app.command()
-def run(plugin_name: str, plugin_args: List[str] = typer.Argument(None)):
+@app.command("run")
+def run(plugin_name: str, plugin_args: Optional[List[str]] = typer.Argument(None)):
     """
     Run a plugin with optional arguments.
     """
     console.print(f"[bold green]🚀 Running plugin:[/bold green] {plugin_name}")
     runner = CapGateRunner(cli_state=cli_state)
     ensure_directories()
+
+    # Fix: Ensure plugin_args is always iterable
+    plugin_args = plugin_args or []
+
     runner.run_plugin(plugin_name, *plugin_args)
+
     console.print(f"[green]✅ Done.[/green]")
+
 
 @app.command("create-plugin")
 def create_plugin_command(name: str,

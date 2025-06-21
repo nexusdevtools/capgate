@@ -52,24 +52,77 @@ class TopologyGraph:
 
     @classmethod
     def build_from_context(cls) -> "TopologyGraph":
+        """
+        Dynamically generate a topology graph based on current AppContext data.
+        """
         ctx = AppContext()
-        graph_data = {"nodes": [], "edges": []}
+        graph = cls.__new__(cls)  # Create uninitialized instance
+        graph.console = Console()
+        graph.graph = nx.Graph()
+        graph.nodes = []
+        graph.edges = []
 
-        # Convert devices into nodes
-        for mac, dev in ctx.devices.items():
-            graph_data["nodes"].append({"id": mac, "label": dev.get("label", mac)})
+        # Add interface nodes
+        for name, iface in ctx.interfaces.items():
+            graph.graph.add_node(name, label=f"Interface: {name}", **iface)
+            graph.nodes.append({"id": name, "label": f"{name} ({iface.get('type', 'unknown')})"})
 
-        # Add known edges (fake for now — can be learned later)
-        for mac in ctx.devices:
-            if ctx.interfaces:
-                ap_id = list(ctx.interfaces.keys())[0]
-                graph_data["edges"].append({"source": ap_id, "target": mac})
+        # Add device nodes (TODO: this will expand with ARP or DHCP data)
+        for device in ctx.devices:
+            mac = device.get("mac")
+            if not mac:
+                continue
+            if not isinstance(mac, str):
+                mac = mac.hex()
+            if not mac:
+                continue
+            if not mac.startswith("00:"):
+                mac = ":".join(mac[i:i+2] for i in range(0, len(mac), 2))
+            if not mac:
+                continue
+            if mac in graph.graph:
+                continue
+            # Use hostname or IP as label if available
+            if not isinstance(device, dict):
+                device = device.dict()
+            if not isinstance(device, dict):
+                device = device.__dict__
+            if "hostname" not in device:
+                device["hostname"] = None
+            if "ip" not in device:
+                device["ip"] = None
+            if "vendor" not in device:
+                device["vendor"] = None
+            if "signal_strength" not in device:
+                device["signal_strength"] = None
+            if "is_router" not in device:
+                device["is_router"] = False
+            if "last_seen" not in device:
+                device["last_seen"] = 0
+            if "type" not in device:
+                device["type"] = "unknown"
+            if "name" not in device:
+                device["name"] = f"Device {mac}"
+            if "ip" in device and not isinstance(device["ip"], str):
+                device["ip"] = device["ip"].split("/")[0]
+            if "mac" not in device:
+                device["mac"] = mac
+            if "name" not in device:
+                device["name"] = f"Device {mac}"
+            if "label" not in device:
+                device["label"] = f"Device {mac}"
+            if "type" not in device:
+                device["type"] = "unknown"
+            if "last_seen" not in device:
+                device["last_seen"] = 0
+            label = device.get("hostname") or device.get("ip") or mac
+            graph.graph.add_node(mac, label=f"Device: {label}", **device)
+            graph.nodes.append({"id": mac, "label": label})
 
-        # Save to discovery path (optional, for dev inspection)
-        os.makedirs("data/topology", exist_ok=True)
-        with open("data/topology/discovery.json", "w") as f:
-            json.dump(graph_data, f, indent=2)
+            # Link device to known interface if IP overlaps
+            for iface in ctx.interfaces.values():
+                if "ip" in iface and iface["ip"].split("/")[0] == device.get("ip"):
+                    graph.graph.add_edge(iface["name"], mac)
+                    graph.edges.append({"source": iface["name"], "target": mac})
 
-        # Return initialized instance
-        return cls("data/topology/discovery.json")
-
+        return graph

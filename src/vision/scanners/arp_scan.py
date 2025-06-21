@@ -8,7 +8,6 @@ from core.logger import get_logger
 
 logger = get_logger("vision.scanners.arp_scan")
 
-
 def arp_scan(interface: str, target_range: str = "192.168.1.0/24") -> List[Dict[str, str]]:
     """
     Scans the given IP range for live devices using ARP.
@@ -27,8 +26,8 @@ def arp_scan(interface: str, target_range: str = "192.168.1.0/24") -> List[Dict[
     packet = ether / arp
 
     result = srp(packet, iface=interface, timeout=3, verbose=False)[0]
+    devices = []  # FIXED: Initialize list before appending
 
-    devices = []
     for sent, received in result:
         devices.append({
             "ip": received.psrc,

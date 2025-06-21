@@ -8,7 +8,7 @@ class Device(BaseModel):
     vendor: Optional[str] = None
     signal_strength: Optional[int] = None
     is_router: bool = False
-    last_seen: float = time.time()
+    last_seen: Optional[float] = None
     is_active: bool = True
     is_tracked: bool = False
     is_ignored: bool = False

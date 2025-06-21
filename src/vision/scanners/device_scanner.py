@@ -7,13 +7,14 @@ from core.context import AppContext
 from core.logger import logger
 from db.schemas.device import Device
 
-
 def parse_arp_table() -> List[Tuple[str, str]]:
     """
     Uses `arp -an` to get IP/MAC pairs seen by the host.
+    Returns a list of (MAC, IP) tuples.
     """
     result = subprocess.run(["arp", "-an"], capture_output=True, text=True)
-    devices = []
+    devices = []  # FIXED: declared list to collect devices
+
     for line in result.stdout.strip().splitlines():
         if "incomplete" in line.lower():
             continue
@@ -23,7 +24,6 @@ def parse_arp_table() -> List[Tuple[str, str]]:
             mac = parts[3]
             devices.append((mac, ip))
     return devices
-
 
 def scan_devices():
     ctx = AppContext()
@@ -42,7 +42,6 @@ def scan_devices():
         )
         ctx.update("device", mac, device.dict())
         logger.info(f"[device_scan] Detected device: {mac} ({ip})")
-
 
 if __name__ == "__main__":
     scan_devices()
