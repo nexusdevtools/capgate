@@ -8,6 +8,8 @@ from rich.tree import Tree
 import matplotlib.pyplot as plt
 
 from core.context import AppContext
+from core.debug_tools import debug_var, dump_context, print_exception
+from db.schemas.device import Device  # Assuming Device is defined in this module
 
 class TopologyGraph:
     def __init__(self, json_file: str):

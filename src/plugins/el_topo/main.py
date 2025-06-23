@@ -42,7 +42,14 @@ def inject_devices_into_context(ctx: AppContext, pairs: list[tuple[str, str]]):
                 is_router=False,
                 last_seen=None,
             )
-            ctx.update("device", mac, device.to_dict())
+            ctx.update("device", mac, device.model_dump())
+            ctx.set(f"device:{mac}", device.model_dump())
+            ctx.set(f"device:{mac}:ip", ip)
+            ctx.set(f"device:{mac}:hostname", None)
+            ctx.set(f"device:{mac}:vendor", "Unknown")
+            ctx.set(f"device:{mac}:signal_strength", None)
+            ctx.set(f"device:{mac}:is_router", False)
+            ctx.set(f"device:{mac}:last_seen", time.time()) 
             logger.debug(f"[el_topo] Added device to context: {mac} ({ip})")
         except Exception as e:
             logger.warning(f"[el_topo] Failed to inject device {mac}: {e}")
