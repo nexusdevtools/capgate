@@ -1,0 +1,26 @@
+```mermaid
+flowchart TD
+
+%% Shared State and Context Model
+
+%% CLI Entry Points
+CLI["🚀 CLI Entrypoint"] -->|init| Context["📘 CapGateContext"]
+CLI -->|load config| State["🧠 AppState"]
+
+%% Plugin Interaction
+PluginA["🔌 Plugin A"] -->|read/write| State
+PluginB["🔌 Plugin B"] -->|read/write| State
+PluginA -->|read flags| Context
+
+%% Context and State Connection
+Context -->|links to| State
+
+%% Component Sources
+Scanner["📡 Scanner"] -->|discovers| State
+ConfigLoader["⚙️ Config Loader"] -->|writes settings| State
+PluginRunner["🏃 Plugin Runner"] -->|injects metadata| Context
+
+%% Debugging + CLI Inspection
+Debugger["🔍 Inspector"] -->|dumps| Context
+Debugger -->|dumps| State
+```

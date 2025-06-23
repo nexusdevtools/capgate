@@ -1,13 +1,13 @@
-# cli.py — Entry point for CapGate CLI
+# /home/nexus/capgate/src/cli/cli.py
 
-
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from cli import graph  # your updated graph.py
 from cli.boot import boot_sequence
+from cli.commands.debug_commands import debug_cli
 from core.plugin_creator import create_plugin
 from core.plugin_loader import PluginLoader
 from runner import CapGateRunner
@@ -21,10 +21,11 @@ app = typer.Typer(
 )
 
 console = Console()
-cli_state = {}
+cli_state: Dict[str, Any] = {}
 # Global CLI state dictionary to hold options like mock mode and auto-select
-# Register graph subcommand here
+# Register graph and debug subcommands
 app.add_typer(graph.app, name="graph")
+app.add_typer(debug_cli, name="debug")
 
 @app.callback(invoke_without_command=True)
 def main_callback(ctx: typer.Context,
@@ -142,3 +143,44 @@ def create_plugin_command(name: str,
 
 if __name__ == "__main__":
     app()
+# Run the CLI application
+    app()
+else:
+    # If imported, we can still run the app for testing purposes
+    app(prog_name="capgate")
+    # This allows us to run the CLI commands directly in a Python shell or test environment
+    # without needing to invoke the command line interface.
+    # For example, you can call:
+    # app(["run", "example_plugin", "--mock"])
+    # to simulate running a plugin directly from the Python environment.
+    # This is useful for unit tests or interactive debugging.
+    # Note: In a real application, you might want to handle this differently
+    # to avoid running the CLI when importing the module.
+    # This allows for better modularity and testing capabilities.
+    # You can also use `app.command()` to define additional commands dynamically.
+    # This way, you can extend the CLI without modifying the main application logic.
+    # For example, you could add a command to list available commands:
+    @app.command("list-commands")
+    def list_commands():
+        """
+        List all available commands in the CapGate CLI.
+        """
+        console.print("[bold cyan]Available Commands:[/bold cyan]")
+        for command in app.registered_commands:
+            console.print(f"- {command.name}: {command.help or 'No description available.'}")
+    # This command will print all registered commands with their descriptions.
+    # This is useful for users to discover available functionality in the CLI.
+    # You can also add more commands as needed, following the same pattern.
+    # This modular approach allows for easy expansion and maintenance of the CLI.
+    # You can also define subcommands for specific functionalities.
+    # For example, you could create a subcommand group for network operations:
+    @app.command("network")
+    def network_commands():
+        """
+        Network-related commands.
+        """
+        console.print("[bold cyan]Network Commands:[/bold cyan]")
+        console.print("- `interfaces`: List network interfaces")
+        console.print("- `scan`: Scan for available networks")
+        console.print("- `connect`: Connect to a network")
+        # Add more network-related commands as needed
