@@ -1,21 +1,19 @@
 # capgate/core/context.py — Central context object for CapGate
-# Provides a shared space to store configuration, state, and service references.
-# Accessible by plugins and core components alike.
-
 """
+Central shared context object for CapGate.
+
 ✅ Highlights:
+- Thread-safe Singleton pattern ensures only one instance.
+- Stores interfaces, devices, credentials, plugin state, and event log.
+- Can be updated directly or through `.update()` method.
+- Compatible with all plugins and core modules.
 
-    - Thread-safe singleton pattern (_lock) ensures only one instance exists.
-    - Global knowledge store for interfaces, devices, credentials, plugin state.
-    - Continuous event log for historical intelligence and ML training.
-    - Fully extensible and schema-compatible.
-    - Usage:
+Usage:
+    from core.context import AppContext
 
-        from core.context import AppContext
-
-        ctx = AppContext()
-        ctx.update("interface", "wlan0", iface_obj.dict())
-        ctx.devices["AA:BB:CC:DD:EE:FF"] = device_obj
+    ctx = AppContext()
+    ctx.update("device", "AA:BB:CC:DD:EE:FF", device.model_dump())
+    ctx.get("interfaces")
 """
 
 from threading import Lock
@@ -29,7 +27,6 @@ from capgate_types.core.context_types import (
     MetadataEntry,
     EventLogEntry,
 )
-
 from core.interface_manager import InterfaceManager
 from core.logger import logger
 
@@ -43,21 +40,29 @@ class AppContext:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance._init_context()
-                logger.debug("🔧 Initialized new AppContext instance")
+                logger.debug("🔧 Created AppContext singleton instance.")
         return cls._instance
 
     def _init_context(self):
+        # Private backing store (free-form)
         self._store: Dict[str, Any] = {}
+
+        # Core structured components
         self.interfaces: Dict[str, InterfaceData] = {}
         self.devices: Dict[str, DeviceSchema] = {}
         self.credentials: Dict[str, CredentialData] = {}
         self.metadata: Dict[str, MetadataEntry] = {}
         self.event_log: List[EventLogEntry] = []
 
+        # Initialize and preload detected interfaces
         interface_manager = InterfaceManager()
-        self.interfaces = interface_manager.get_interfaces()
+        self.interfaces = {
+            iface.name: iface.__dict__ for iface in interface_manager.get_interfaces()
+        }
         self.set("interfaces", self.interfaces)
         logger.info(f"Initialized context with {len(self.interfaces)} network interfaces.")
+
+    # -- Core KV Store ----------------------------
 
     def set(self, key: str, value: Any):
         logger.debug(f"📥 Setting context key: '{key}'")
@@ -79,7 +84,7 @@ class AppContext:
             del self._store[key]
 
     def clear(self):
-        logger.warning("⚠️ Clearing entire AppContext store")
+        logger.warning("⚠️ Clearing entire AppContext store and subsystems.")
         self._store.clear()
         self.interfaces.clear()
         self.devices.clear()
@@ -87,19 +92,32 @@ class AppContext:
         self.metadata.clear()
         self.event_log.clear()
 
-    def update(self, type: str, id: str, data: dict):
-        if type == "interface":
-            self.interfaces[id] = data
-        elif type == "device":
-            self.devices[id] = data
-        elif type == "credential":
-            self.credentials[id] = data
-        elif type == "meta":
-            self.metadata[id] = data
-        else:
-            logger.warning(f"Unknown update type: {type}")
+    # -- Unified Update Interface ----------------------------
 
-        self._log_event(type, id, data)
+    def update(self, category: str, item_id: str, data: dict):
+        """
+        Injects structured data into a context category.
+
+        Args:
+            category (str): One of 'interface', 'device', 'credential', 'meta'
+            item_id (str): Unique key (e.g. MAC address, iface name)
+            data (dict): Structured value, e.g. `device.model_dump()`
+        """
+        if category == "interface":
+            self.interfaces[item_id] = data
+        elif category == "device":
+            self.devices[item_id] = data
+        elif category == "credential":
+            self.credentials[item_id] = data
+        elif category == "meta":
+            self.metadata[item_id] = data
+        else:
+            logger.warning(f"⚠️ Unknown update category: '{category}'")
+            return
+
+        self._log_event(category, item_id, data)
+
+    # -- Event Logging ----------------------------
 
     def _log_event(self, type: str, id: str, data: dict):
         event: EventLogEntry = {
@@ -111,8 +129,14 @@ class AppContext:
         self.event_log.append(event)
         logger.debug(f"🧠 Logged event: {type} ({id})")
 
+    # -- Export ------------------------------------
+
     def as_dict(self) -> Dict[str, Any]:
-        logger.debug("📋 Exporting context as dict")
+        """
+        Return a full snapshot of the current context as a serializable dict.
+        Useful for debugging, export, or state dumping.
+        """
+        logger.debug("📋 Exporting AppContext as dictionary.")
         return {
             "interfaces": self.interfaces,
             "devices": self.devices,
@@ -121,3 +145,11 @@ class AppContext:
             "store": dict(self._store),
             "event_log": list(self.event_log),
         }
+    def __repr__(self):
+        return f"<AppContext: {len(self.interfaces)} interfaces, {len(self.devices)} devices, {len(self.credentials)} credentials, {len(self.metadata)} metadata entries>"
+    def __str__(self):
+        return f"AppContext with {len(self.interfaces)} interfaces, {len(self.devices)} devices, {len(self.credentials)} credentials, {len(self.metadata)} metadata entries, and {len(self.event_log)} events logged."
+    def __len__(self):
+        return len(self._store)
+    def __contains__(self, key: str) -> bool:
+        return key in self._store

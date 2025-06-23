@@ -1,8 +1,9 @@
 # src/core/utils.py
 
+from typing import Dict
 import re
 
-def render_template(template_str: str, replacements: dict) -> str:
+def render_template(template_str: str, replacements: Dict[str, str]) -> str:
     for key, val in replacements.items():
         template_str = template_str.replace(key, val)
     return template_str

@@ -1,8 +1,12 @@
 # runner.py
 
 import sys
-from typing import Optional, List, Any
+from typing import Optional, Dict, Any, List
+import json
+from pathlib import Path
 
+from core.debug_tools import debug_var
+from core.debug_tools import dump_context, print_exception
 from core.logger import logger
 from core.plugin_loader import PluginLoader
 from core.context import AppContext
@@ -18,7 +22,7 @@ class CapGateRunner:
     managing context, and executing plugins or workflows.
     """
 
-    def __init__(self, context: Optional[AppContext] = None, cli_state: Optional[dict] = None):
+    def __init__(self, context: Optional[AppContext] = None, cli_state: Optional[Dict[str, Any]] = None):
         self.context = context or AppContext()
         self.plugin_loader = PluginLoader()
         self.interface_manager = InterfaceManager()
@@ -60,11 +64,17 @@ class CapGateRunner:
 
         plugin = self.plugin_loader.plugins[name]
         try:
+            debug_var(name, "Plugin Name")
+            debug_var(args, "Args")
+            debug_var(kwargs, "Kwargs")
+            dump_context(self.context)
+
             self.logger.info(f"Executing plugin '{name}' with arguments {args} {kwargs}")
             return plugin.module.run(self.context, *args, **kwargs)
         except Exception as e:
+            print_exception(e)
             self.logger.error(f"Plugin '{name}' execution failed: {e}")
-            return None
+            return
 
     def get_interfaces(
         self,
@@ -76,19 +86,22 @@ class CapGateRunner:
         Return a filtered list of InterfaceInfo objects.
         """
         interfaces: List[InterfaceInfo] = self.context.get("interfaces", [])
+        debug_var(wireless_only, "wireless_only")
+        debug_var(monitor_only, "monitor_only")
+        debug_var(is_up_only, "is_up_only")
+        debug_var(interfaces, "Available Interfaces Before Filtering")
 
         if wireless_only:
             interfaces = [iface for iface in interfaces if iface.is_wireless]
-
         if monitor_only:
             interfaces = [iface for iface in interfaces if iface.supports_monitor_mode()]
-
         if is_up_only:
             interfaces = [iface for iface in interfaces if iface.is_up]
 
+        debug_var(interfaces, "Filtered Interfaces")
         return interfaces
 
-    def run(self, plugin_name: Optional[str] = None, *args, **kwargs):
+    def run(self, *args: Any, plugin_name: Optional[str] = None, **kwargs: Any):
         """
         Entrypoint to execute a plugin or default flow.
         """

@@ -1,40 +1,38 @@
-# capgate/plugins/topology_discovery/main.py
+import subprocess
+import re
+from typing import List, Tuple
 
+from core.debug_tools import debug_var, dump_context, print_exception
 from core.context import AppContext
 from core.logger import logger
 from core.graphs.topology import TopologyGraph
 from db.schemas.device import Device
-import subprocess
-import re
 
-class TopologyDiscovery:
+
+def parse_arp_table() -> List[Tuple[str, str]]:
     """
-    Plugin: Topology Discovery
-    --------------------------
-    - Parses ARP table
-    - Detects live hosts
-    - Links them to current interfaces
-    - Pushes live results to AppContext
-    - Generates a real-time topology graph
+    Uses `arp -an` to parse IP-MAC pairs from local ARP table.
+    Returns:
+        List of (ip, mac) tuples for discovered devices.
     """
+    result = subprocess.run(["arp", "-an"], capture_output=True, text=True)
+    discovered: List[Tuple[str, str]] = []
 
-    def __init__(self):
-        self.ctx = AppContext()
+    for line in result.stdout.splitlines():
+        match = re.search(r"\((.*?)\) at ([\w:]+)", line)
+        if match:
+            ip, mac = match.groups()
+            if mac != "00:00:00:00:00:00":
+                discovered.append((ip, mac))
+    return discovered
 
-    def parse_arp(self):
-        result = subprocess.run(["arp", "-an"], capture_output=True, text=True)
-        discovered = []
 
-        for line in result.stdout.splitlines():
-            match = re.search(r"\((.*?)\) at ([\w:]+)", line)
-            if match:
-                ip, mac = match.groups()
-                if mac != "00:00:00:00:00:00":
-                    discovered.append((ip, mac))
-        return discovered
-
-    def inject_devices(self, pairs):
-        for ip, mac in pairs:
+def inject_devices_into_context(ctx: AppContext, pairs: list[tuple[str, str]]):
+    """
+    Takes a list of IP-MAC pairs and injects them into AppContext.
+    """
+    for ip, mac in pairs:
+        try:
             device = Device(
                 mac=mac,
                 ip=ip,
@@ -44,21 +42,37 @@ class TopologyDiscovery:
                 is_router=False,
                 last_seen=None,
             )
-            self.ctx.update("device", mac, device.dict())
+            ctx.update("device", mac, device.to_dict())
+            logger.debug(f"[el_topo] Added device to context: {mac} ({ip})")
+        except Exception as e:
+            logger.warning(f"[el_topo] Failed to inject device {mac}: {e}")
 
-    def run(self):
-        logger.info("🌐 Running Topology Discovery Plugin...")
-        arp_entries = self.parse_arp()
-        self.inject_devices(arp_entries)
-        TopologyGraph.build_from_context().export_png()
-        logger.info("✅ Topology discovery completed and exported.")
 
-# --- THIS IS THE REQUIRED ENTRY POINT ---
-def run(*args, **kwargs):
+# --- MAIN ENTRY POINT ---
+def run(app_context: AppContext, *plugin_args: str):
     """
-    Top-level entry point for the plugin system.
+    Plugin entry point. Follows CapGate plugin structure convention.
+    Args:
+        app_context (AppContext): Global context shared across CapGate
+        plugin_args (tuple[str]): Optional CLI args passed to the plugin
     """
-    TopologyDiscovery().run()
+    try:
+        logger.info("🌐 Running el_topo: Topology Discovery Plugin...")
 
-if __name__ == "__main__":
-    run()
+        debug_var(app_context, "app_context")
+        debug_var(plugin_args, "plugin_args")
+        dump_context(app_context)
+
+        arp_entries = parse_arp_table()
+        inject_devices_into_context(app_context, arp_entries)
+
+        topo = TopologyGraph.build_from_context()
+        topo.export_png()
+
+        logger.info("✅ el_topo: Topology discovery completed and exported.")
+    except Exception as e:
+        print_exception(e)
+        logger.error(f"❌ el_topo: An error occurred during execution: {e}")
+        return False
+    return True
+# --- END OF MAIN ENTRY POINT ---

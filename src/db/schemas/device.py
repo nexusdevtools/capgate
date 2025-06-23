@@ -1,10 +1,48 @@
-# capgate/db/schemas/device.py
-from pydantic import BaseModel
-from typing import Optional
-import time
+from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict
+
 
 class Device(BaseModel):
     mac: str
+    ip: Optional[str] = None
+    hostname: Optional[str] = None
+    name: Optional[str] = None
+    label: Optional[str] = None
+    type: Optional[str] = None
+    model: Optional[str] = None
+    os: Optional[str] = None
+    os_version: Optional[str] = None
+    firmware_version: Optional[str] = None
+    hardware_version: Optional[str] = None
+    serial_number: Optional[str] = None
+    model_number: Optional[str] = None
+    product_name: Optional[str] = None
+    product_id: Optional[str] = None
+    product_url: Optional[str] = None
+    product_description: Optional[str] = None
+    product_image: Optional[str] = None
+    product_category: Optional[str] = None
+    product_subcategory: Optional[str] = None
+    product_tags: Optional[list[str]] = None
+    product_features: Optional[list[str]] = None
+    product_specs: Optional[dict[str, Any]] = None
+    product_manual: Optional[str] = None
+    product_support_url: Optional[str] = None
+    product_support_email: Optional[str] = None
+    product_support_phone: Optional[str] = None
+    product_support_hours: Optional[str] = None
+    product_release_date: Optional[str] = None
+    product_discontinued: Optional[bool] = None
+    product_warranty: Optional[str] = None
+    product_certifications: Optional[list[str]] = None
+    product_compliance: Optional[list[str]] = None
+    product_compatibility: Optional[list[str]] = None
+    product_accessories: Optional[list[str]] = None
+    product_related: Optional[list[str]] = None
+    product_resources: Optional[list[str]] = None
+    product_notes: Optional[str] = None
+    product_custom_fields: Optional[dict[str, Any]] = None
+    product_custom_tags: Optional[list[str]] = None
     vendor: Optional[str] = None
     signal_strength: Optional[int] = None
     is_router: bool = False
@@ -59,5 +97,11 @@ class Device(BaseModel):
     is_tablet: bool = False
     is_wearable: bool = False
     is_vehicle: bool = False
-    is_unknown: bool = False # Catch-all for any device not classified
-    is_custom: bool = False  # For user-defined device types
+    is_unknown: bool = False
+    is_custom: bool = False
+
+    model_config = ConfigDict(extra='allow')  # allow future additions
+
+    def to_dict(self) -> dict[str, Any]:
+        """Safe export for injection into AppContext or JSON."""
+        return self.model_dump(exclude_none=True)

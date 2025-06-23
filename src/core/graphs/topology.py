@@ -63,9 +63,14 @@ class TopologyGraph:
         graph.edges = []
 
         # Add interface nodes
-        for name, iface in ctx.interfaces.items():
-            graph.graph.add_node(name, label=f"Interface: {name}", **iface)
-            graph.nodes.append({"id": name, "label": f"{name} ({iface.get('type', 'unknown')})"})
+        interfaces = ctx.get("interfaces", [])
+        for iface in interfaces:
+            name = iface.get("name") if isinstance(iface, dict) else getattr(iface, "name", None)
+            iface_data = iface if isinstance(iface, dict) else iface.__dict__
+            if not name:
+                continue
+            graph.graph.add_node(name, label=f"Interface: {name}", **iface_data)
+            graph.nodes.append({"id": name, "label": f"{name} ({iface_data.get('type', 'unknown')})"})
 
         # Add device nodes (TODO: this will expand with ARP or DHCP data)
         for device in ctx.devices:
