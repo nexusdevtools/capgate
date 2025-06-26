@@ -7,12 +7,12 @@ including WPA/WPA2 handshakes using airodump-ng and aireplay-ng.
 import subprocess
 import time
 import os
-from typing import Optional, Dict, Any, Tuple
+import tempfile  # <--- CRITICAL FIX: Import tempfile
+from typing import Optional
 
 from core.logger import logger
-from helpers import shelltools # Assuming shelltools path is correct
-# You might need to import your AppState or Interface model if these functions need to read/update complex state
-# from core.state_management.state import AppState
+from helpers import shelltools 
+# from core.state_management.state import AppState # Not directly needed in CaptureManager
 
 
 class CaptureManager:
@@ -21,7 +21,6 @@ class CaptureManager:
     """
     def __init__(self):
         self.logger = logger
-        # self.app_state = app_state # If it needs to directly read/write from AppState beyond function args
 
     def capture_handshake(self, 
                           monitor_interface: str, 
@@ -30,7 +29,7 @@ class CaptureManager:
                           output_file_prefix: str,
                           capture_time_seconds: int = 30,
                           deauth_count: int = 5,
-                          auto_mode: bool = False # For non-interactive waiting
+                          auto_mode: bool = False
                          ) -> Optional[str]:
         """
         Attempts to capture a WPA/WPA2 handshake for a given target.

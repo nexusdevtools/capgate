@@ -1,9 +1,7 @@
 # src/vision/scanners/iface_scanner.py
 
 import subprocess
-import ipaddress
-import time # Included for general timestamp usage if needed, though not directly in this file's main logic flow.
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any
 import re
 
 from core.logger import logger
@@ -79,8 +77,21 @@ def _get_iw_phy_capabilities(phy_full_name: str) -> Dict[str, Any]:
         'supports_11g': False,
         'supports_11b': False,
         'supports_11a': False,
-        **{f"supports_11ax_he{bw}": False for bw in [80, 160, 240, 320, 480, 640, 960, 1280, 1600, 1920, 2240, 2560, 2880, 3200, 3520, 3840, 4160, 4480, 4800, 5120, 5440, 5760, 6080, 6400, 6720, 7040, 7360, 7680, 8000, 8320, 8640, 8960, 9280, 9600, 9920, 10240, 10560, 10880, 11200, 11520, 11840, 12160, 12480, 12800, 13120, 13440, 13760, 14080, 14400, 14720, 15040, 15360, 15680, 16000, 16320, 16640, 16960, 17280, 17600, 17920, 18240, 18560, 18880, 19200, 19520, 19840, 20160, 20480, 20800, 21120, 21440, 21760, 22080, 22400, 22720, 23040, 23360, 23680, 24000, 24320, 24640, 24960, 25280, 25600, 25920, 26240, 26560, 26880, 27200, 27520, 27840, 28160, 28480, 28800, 29120, 29440, 29760, 30080, 30400, 30720, 31040, 31360, 31680, 32000, 32320, 32640, 32960, 33280, 33600, 33920, 34240, 34560, 34880, 35200, 35520, 35840, 36160, 36480, 36800, 37120, 37440, 37760, 38080, 38400, 38720, 39040, 39360, 39680, 40000, 40320, 40640, 40960, 41280, 41600]}
     }
+    # Add supports_11ax_he{bw} keys
+    for bw in [
+        80, 160, 240, 320, 480, 640, 960, 1280, 1600, 1920, 2240, 2560, 2880, 3200, 3520, 3840, 4160,
+        4480, 4800, 5120, 5440, 5760, 6080, 6400, 6720, 7040, 7360, 7680, 8000, 8320, 8640, 8960, 9280,
+        9600, 9920, 10240, 10560, 10880, 11200, 11520, 11840, 12160, 12480, 12800, 13120, 13440, 13760,
+        14080, 14400, 14720, 15040, 15360, 15680, 16000, 16320, 16640, 16960, 17280, 17600, 17920, 18240,
+        18560, 18880, 19200, 19520, 19840, 20160, 20480, 20800, 21120, 21440, 21760, 22080, 22400, 22720,
+        23040, 23360, 23680, 24000, 24320, 24640, 24960, 25280, 25600, 25920, 26240, 26560, 26880, 27200,
+        27520, 27840, 28160, 28480, 28800, 29120, 29440, 29760, 30080, 30400, 30720, 31040, 31360, 31680,
+        32000, 32320, 32640, 32960, 33280, 33600, 33920, 34240, 34560, 34880, 35200, 35520, 35840, 36160,
+        36480, 36800, 37120, 37440, 37760, 38080, 38400, 38720, 39040, 39360, 39680, 40000, 40320, 40640,
+        40960, 41280, 41600
+    ]:
+        capabilities[f"supports_11ax_he{bw}"] = False
 
     try:
         result = subprocess.run(["iw", "list"], capture_output=True, text=True, check=False)
@@ -218,9 +229,6 @@ def scan_interfaces_and_update_state(app_state: AppState):
             is_wireless = False
             phy_name = None # This will be the number (e.g., "0")
             current_mode = "ethernet" # Default for wired
-            ssid = None
-            tx_power = None
-            channel_frequency = None
             
             # Initialize iface_data with schema defaults to ensure all fields are present
             # Creating a dummy instance and converting to dict is a neat trick for this
