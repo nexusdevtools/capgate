@@ -1,85 +1,71 @@
-import subprocess
-import re
-from typing import List, Tuple
-import time
-from core.debug_tools import debug_var, dump_context, print_exception
-from core.context import AppContext
+# src/plugins/el_topo/main.py
+
+# Removed subprocess and re imports as discovery logic is moved
+# Removed time import as last_seen is handled by scanners/runner
+# from core.debug_tools import debug_var, dump_context, print_exception # These are generally useful for plugins
 from core.logger import logger
+from core.state_management.context import CapGateContext # Import CapGateContext, not AppContext
+# Removed AppContext import as CapGateContext is the new entry point
 from core.graphs.topology import TopologyGraph
-from db.schemas.device import Device
-
-
-def parse_arp_table() -> List[Tuple[str, str]]:
-    """
-    Uses `arp -an` to parse IP-MAC pairs from local ARP table.
-    Returns:
-        List of (ip, mac) tuples for discovered devices.
-    """
-    result = subprocess.run(["arp", "-an"], capture_output=True, text=True)
-    discovered: List[Tuple[str, str]] = []
-
-    for line in result.stdout.splitlines():
-        match = re.search(r"\((.*?)\) at ([\w:]+)", line)
-        if match:
-            ip, mac = match.groups()
-            if mac != "00:00:00:00:00:00":
-                discovered.append((ip, mac))
-    return discovered
-
-
-def inject_devices_into_context(ctx: AppContext, pairs: list[tuple[str, str]]):
-    """
-    Takes a list of IP-MAC pairs and injects them into AppContext.
-    """
-    for ip, mac in pairs:
-        try:
-            device = Device(
-                mac=mac,
-                ip=ip,
-                hostname=None,
-                vendor="Unknown",
-                signal_strength=None,
-                is_router=False,
-                last_seen=None,
-            )
-            ctx.update("device", mac, device.model_dump())
-            ctx.set(f"device:{mac}", device.model_dump())
-            ctx.set(f"device:{mac}:ip", ip)
-            ctx.set(f"device:{mac}:hostname", None)
-            ctx.set(f"device:{mac}:vendor", "Unknown")
-            ctx.set(f"device:{mac}:signal_strength", None)
-            ctx.set(f"device:{mac}:is_router", False)
-            ctx.set(f"device:{mac}:last_seen", time.time()) 
-            logger.debug(f"[el_topo] Added device to context: {mac} ({ip})")
-        except Exception as e:
-            logger.warning(f"[el_topo] Failed to inject device {mac}: {e}")
+# Removed db.schemas.device.Device as device injection is moved
+# Removed parse_arp_table as discovery is moved
+# Removed inject_devices_into_context as device injection is moved
 
 
 # --- MAIN ENTRY POINT ---
-def run(app_context: AppContext, *plugin_args: str):
+# CRITICAL CHANGE: app_context is now CapGateContext, as that's what the runner passes
+def run(app_context: CapGateContext, *plugin_args: str):
     """
-    Plugin entry point. Follows CapGate plugin structure convention.
+    Plugin entry point for 'el_topo'.
+    This plugin visualizes the network topology based on data already present in AppState.
+
     Args:
-        app_context (AppContext): Global context shared across CapGate
-        plugin_args (tuple[str]): Optional CLI args passed to the plugin
+        app_context (CapGateContext): Global context shared across CapGate,
+                                       containing a reference to AppState.
+        plugin_args (tuple[str]): Optional CLI args passed to the plugin.
     """
     try:
-        logger.info("🌐 Running el_topo: Topology Discovery Plugin...")
+        logger.info("🌐 Running el_topo: Topology Visualization Plugin...")
 
-        debug_var(app_context, "app_context")
-        debug_var(plugin_args, "plugin_args")
-        dump_context(app_context)
+        # No need to inject devices here; they should already be in app_context.state.discovery_graph
+        # via the runner's initialization phase.
 
-        arp_entries = parse_arp_table()
-        inject_devices_into_context(app_context, arp_entries)
+        # debug_var(app_context, "app_context") # Uncomment for debugging context passed to plugin
+        # debug_var(plugin_args, "plugin_args") # Uncomment for debugging plugin args
+        # dump_context(app_context) # Uncomment to see the full context state at plugin start
 
+        # The TopologyGraph.build_from_context() method is already designed
+        # to fetch data directly from app_context.state.discovery_graph.
         topo = TopologyGraph.build_from_context()
-        topo.export_png()
+        
+        # Determine output options from plugin_args or default behavior
+        # Example: if you want to allow --ascii or --png flags for the plugin
+        # In this simple case, we'll just export PNG by default.
+        export_png = True # Default behavior
+        print_ascii = False # Default behavior
 
-        logger.info("✅ el_topo: Topology discovery completed and exported.")
+        # You can parse plugin_args here if you want to control output
+        # For example:
+        if "--ascii" in plugin_args:
+            print_ascii = True
+        if "--no-png" in plugin_args: # Example for disabling default PNG
+            export_png = False
+
+        if print_ascii:
+            topo.print_ascii()
+
+        if export_png:
+            topo.export_png()
+            logger.info("✅ el_topo: Topology PNG exported.")
+        else:
+            logger.info("ℹ️ el_topo: PNG export skipped (use --no-png to disable).")
+
+        logger.info("✅ el_topo: Topology visualization completed.")
     except Exception as e:
-        print_exception(e)
-        logger.error(f"❌ el_topo: An error occurred during execution: {e}")
+        # Using print_exception from core.debug_tools for consistent error logging
+        from core.debug_tools import print_exception
+        print_exception(e, "An error occurred during el_topo plugin execution") # Pass message
+        logger.error(f"❌ el_topo: Plugin execution failed: {e}")
         return False
     return True
 # --- END OF MAIN ENTRY POINT ---

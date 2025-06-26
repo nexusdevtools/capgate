@@ -1,9 +1,10 @@
 # capgate/cli/graphs.py — CLI interface for CapGate topology graph visualization
 
-import typer
 from pathlib import Path
 import json
+from typing import Optional, Any # Ensure Any is imported for dict[str, Any]
 from rich.console import Console
+import typer
 
 from core.graphs.topology import TopologyGraph
 
@@ -19,7 +20,8 @@ DEFAULT_DISCOVERY_PATHS = [
     Path("/home/nexus/capgate/data/topology/discovery.json"),
 ]
 
-def find_discovery_file(custom_path: str = None) -> Path:
+
+def find_discovery_file(custom_path: Optional[str] = None) -> Path:
     """
     Search for discovery.json across common fallback paths or use a user-defined path.
     """
@@ -37,7 +39,8 @@ def find_discovery_file(custom_path: str = None) -> Path:
     console.print("[red]❌ discovery.json not found in default locations.[/red]")
     raise typer.Exit(1)
 
-def print_ascii_graph(data: dict):
+# Type hint for data parameter improved to dict[str, Any]
+def print_ascii_graph(data: dict[str, Any]):
     """
     Render a basic ASCII view of nodes and edges from topology JSON.
     """
@@ -65,7 +68,7 @@ def show_discovery_file(
     """
     📂 Show or export a saved discovery topology from JSON.
     """
-    discovery_file = find_discovery_file(discovery)
+    discovery_file: Path = find_discovery_file(discovery) # Explicitly type `discovery_file`
     console.print(f"[green]✔ Using discovery file:[/green] {discovery_file}")
 
     with open(discovery_file, "r") as f:
@@ -75,7 +78,8 @@ def show_discovery_file(
         print_ascii_graph(data)
 
     if png:
-        topo = TopologyGraph(discovery_file)
+        # CRITICAL FIX: Convert Path object to string for TopologyGraph.__init__
+        topo = TopologyGraph(str(discovery_file)) 
         topo.export_png()
 
     if not ascii and not png:
@@ -90,6 +94,7 @@ def live_topology(
     🧠 Generate topology from live AppContext memory and optionally render/export it.
     """
     console.print("[cyan]⏳ Building topology from live memory...[/cyan]")
+    # This calls TopologyGraph.build_from_context(), which correctly gets data from AppState
     topo = TopologyGraph.build_from_context()
 
     if ascii:

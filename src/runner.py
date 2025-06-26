@@ -2,25 +2,27 @@
 
 import sys
 import json
-import ipaddress # Added for network parsing
+import ipaddress
+import time # Added for last_seen timestamp
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from core.logger import logger
 from core.plugin_loader import PluginLoader
-from core.interface_manager import InterfaceInfo # Keep for InterfaceInfo schema
+# Import the Interface Pydantic schema directly, as it's the new data model
+from db.schemas.interface import Interface # <--- CRITICAL CHANGE: Changed from InterfaceInfo
+from db.schemas.device import Device  # <-- Add this import for Device schema
+
 from core.debug_tools import debug_var, dump_context, print_exception
 
 # Updated context imports
-from core.state_management.context import get_context # Only need get_context, as it's a singleton
-from core.state_management.state import get_state, AppState # Need AppState and its getter
+from core.state_management.context import get_context, CapGateContext
+from core.state_management.state import get_state, AppState # Correct AppState import
 
-# Import your scanner functions
-# Ensure these paths are correct relative to your project structure
-from vision.scanners.device_scanner import scan_devices
-from vision.scanners.iface_scan import scan_interfaces_and_update_state # Updated to use AppState
-from vision.scanners.arp_scan import arp_scan
-from vision.scanners.iface_scan import scan_interfaces_and_update_context
+# Import your scanner functions (ensure correct paths based on your tree)
+from vision.scanners.device_scanner import scan_devices_from_arp_table_and_update_state # Renamed as per discussion
+from vision.scanners.iface_scanner import scan_interfaces_and_update_state # Renamed as per discussion
+from vision.scanners.arp_scan import arp_scan # Utility function, returns dicts, doesn't update state directly
 
 from paths import ensure_directories
 
@@ -38,15 +40,16 @@ class CapGateRunner:
         self.cli_state = cli_state or {}
 
         # Get the singleton context instance
-        self.context = get_context()
+        self.context: CapGateContext = get_context()
         # Get the singleton app state instance (which is already referenced by self.context.state)
-        self.app_state = get_state() 
+        self.app_state: AppState = get_state() 
 
         self.plugin_loader = PluginLoader()
-        # The InterfaceManager's role might be partly absorbed by scan_interfaces_and_update_context,
-        # but keep it if it has other responsibilities.
-        # If scan_interfaces_and_update_context is comprehensive, InterfaceManager might become redundant here.
-        # For now, let's assume scan_interfaces_and_update_context is the primary interface scanner.
+        # InterfaceManager's role is now primarily as an accessor to AppState
+        # and a trigger for rescanning, not to manage its own list of interfaces.
+        # It's better to instantiate it only if explicitly needed for its methods.
+        # Or remove it from __init__ if its refresh method is triggered directly.
+        # For now, let's keep it minimal, assuming core setup is handled by scanners directly.
         # self.interface_manager = InterfaceManager() 
         
         self._initialize_core_state() # Renamed to reflect broader initialization
@@ -57,81 +60,76 @@ class CapGateRunner:
         """
         self.logger.info("Starting comprehensive core state initialization...")
 
-        # Initialize discovery_graph if it's None
-        if self.app_state.discovery_graph is None:
-            self.app_state.discovery_graph = {"interfaces": {}, "devices": {}}
+        # Initialize discovery_graph if it's None in AppState (AppState __init__ now handles this)
+        # if self.app_state.discovery_graph is None:
+        #     self.app_state.discovery_graph = {"interfaces": {}, "devices": {}}
 
         # --- Step 1: Discover and add interfaces to AppState.discovery_graph ---
-        # The `scan_interfaces_and_update_context` needs to know it should update AppState directly
-        # or the runner needs to pull the data from it and set it.
-        # Let's modify `scan_interfaces_and_update_context` to accept an AppState object directly
-        # or have it return the discovered interfaces, and the runner sets them.
+        # `scan_interfaces_and_update_state` now directly updates `self.app_state.discovery_graph['interfaces']`
+        scan_interfaces_and_update_state(self.app_state) 
         
-        # Option A (Better): Modify scan_interfaces_and_update_context to take AppState
-        # For this to work, you'd need to change `scan_interfaces_and_update_context(ctx: AppContext)`
-        # to `scan_interfaces_and_update_state(app_state: AppState)`.
-        # Assuming we can pass app_state directly to scanners now:
-        scan_interfaces_and_update_state(self.app_state) # <--- Potential change needed in iface_scan.py
-        
-        # Option B (If scanners must only talk to CapGateContext):
-        # Temp context for interfaces, then move to AppState
-        # temp_iface_context = CapGateContext() # This would be if scanner can't take AppState directly
-        # scan_interfaces_and_update_context(temp_iface_context)
-        # self.app_state.discovery_graph['interfaces'] = temp_iface_context.get("interfaces", {})
-
-
-        # Let's assume for now the scanner directly populates discovery_graph in AppState
-        # after modification. So, the interfaces will be in self.app_state.discovery_graph['interfaces']
-
         num_interfaces = len(self.app_state.discovery_graph.get("interfaces", {}))
         self.logger.info(f"Initialized state with {num_interfaces} network interfaces.")
 
         # --- Step 2: Perform initial device discovery (ARP table for quick local view) ---
-        # Similarly, `scan_devices_from_arp_table` should update AppState directly
-        scan_devices_from_arp_table_and_update_state(self.app_state) # <--- Potential change needed in device_scan.py
+        # `scan_devices_from_arp_table_and_update_state` now directly updates `self.app_state.discovery_graph['devices']`
+        scan_devices_from_arp_table_and_update_state(self.app_state) 
 
         # --- Step 3: Perform active ARP scan on active interfaces (more comprehensive device discovery) ---
-        interfaces_for_scan = self.app_state.discovery_graph.get("interfaces", {}).values()
+        # Retrieve interfaces from the app_state's discovery_graph (which are dicts at this point)
+        interfaces_for_scan_data = self.app_state.discovery_graph.get("interfaces", {}).values()
         
-        for iface_info_dict in interfaces_for_scan:
-            # Reconstruct InterfaceInfo object from dict for property access if needed, or access dict keys
-            # iface_obj = InterfaceInfo(**iface_info_dict) # If you want to use methods like .is_up
-            
+        for iface_info_dict in interfaces_for_scan_data:
+            # Check if interface is up and has an IP address to perform ARP scan
             if iface_info_dict.get("is_up") and iface_info_dict.get("ip_address"):
                 interface_name = iface_info_dict.get("name")
                 ip_with_cidr = iface_info_dict.get("ip_address") 
 
                 if interface_name and ip_with_cidr:
                     try:
+                        # Use ipaddress to get the network range from CIDR
                         network_obj = ipaddress.ip_network(ip_with_cidr, strict=False)
                         target_range = str(network_obj)
                         
                         self.logger.info(f"Performing active ARP scan on {interface_name} for range {target_range}")
-                        discovered_devices = arp_scan(interface_name, target_range)
+                        # arp_scan is a utility, it returns raw device dictionaries
+                        discovered_devices_raw = arp_scan(interface_name, target_range)
 
-                        for dev_info in discovered_devices:
-                            mac = dev_info.get("mac")
-                            ip = dev_info.get("ip")
+                        for dev_info_raw in discovered_devices_raw:
+                            mac = dev_info_raw.get("mac")
+                            ip = dev_info_raw.get("ip")
                             if mac and ip:
-                                # Add/Update device directly in app_state.discovery_graph['devices']
-                                # This requires a new method in AppState or manual dict update
-                                self.app_state.discovery_graph['devices'][mac] = {
+                                # Prepare device data for update
+                                # It's good practice to create the Pydantic model for validation
+                                # then convert to dict for storage.
+                                # Merge with existing data if device already partially exists to retain info.
+                                existing_dev_data = self.app_state.discovery_graph['devices'].get(mac, {})
+                                
+                                # Create a temporary Pydantic model to merge and validate new data
+                                # If existing_dev_data contains all fields, pass it first, then overwrite with new.
+                                merged_data: Dict[str, Any] = {**existing_dev_data, **{
                                     "mac": mac,
                                     "ip": ip,
-                                    "hostname": dev_info.get("hostname"), # If arp_scan provides it
-                                    "vendor": None, # TODO: Lookup
+                                    "hostname": dev_info_raw.get("hostname"), # If arp_scan provides it
+                                    "vendor": None, # Needs external lookup
                                     "is_router": False, # Needs further checks
-                                    "last_seen": time.time(), # Use time.time() from runner's scope if that's allowed
-                                }
+                                    "last_seen": time.time(), # Timestamp when this device was actively seen
+                                }}
+                                
+                                # Validate with Device schema and convert to dictionary
+                                validated_dev_data = Device(**merged_data).to_dict()
+
+                                # Update the global AppState with the device data
+                                self.app_state.update_devices({mac: validated_dev_data})
                                 self.logger.info(f"Discovered via ARP scan: {mac} ({ip})")
                     except ValueError as ve:
                         self.logger.warning(f"Invalid IP address or network format for {interface_name}: {ip_with_cidr} - {ve}")
                     except Exception as e:
                         self.logger.error(f"Error during ARP scan on {interface_name}: {e}")
                 else:
-                    self.logger.debug(f"Skipping ARP scan for {interface_name}: not up or no IP.")
+                    self.logger.debug(f"Skipping ARP scan for {iface_info_dict.get('name')}: name or IP missing.")
             else:
-                self.logger.debug(f"Skipping ARP scan for {iface_info_dict.get('name')}: not up or no IP.")
+                self.logger.debug(f"Skipping ARP scan for {iface_info_dict.get('name')}: interface not up or no IP address configured.")
 
 
         total_devices = len(self.app_state.discovery_graph.get("devices", {}))
@@ -186,39 +184,38 @@ class CapGateRunner:
         wireless_only: bool = False,
         monitor_only: bool = False,
         is_up_only: bool = False
-    ) -> List[InterfaceInfo]:
+    ) -> List[Interface]: # <--- CRITICAL CHANGE: Return type is now List[Interface]
         """
         Filter and return network interfaces from AppState.discovery_graph.
         """
-        # Retrieve interfaces from the AppState's discovery_graph
+        # Retrieve interfaces data from the AppState's discovery_graph
         interfaces_data = self.app_state.discovery_graph.get("interfaces", {}).values()
         
-        # Convert the dictionary data back into InterfaceInfo objects for consistent filtering
-        interfaces_list: List[InterfaceInfo] = []
+        # Convert the dictionary data back into Pydantic Interface objects for consistent filtering
+        interfaces_list: List[Interface] = []
         for iface_data in interfaces_data:
             try:
-                # Assuming InterfaceInfo constructor can take the dictionary directly
-                interfaces_list.append(InterfaceInfo(**iface_data))
-            except TypeError as te:
-                self.logger.error(f"Error converting interface data to InterfaceInfo: {iface_data} - {te}")
+                interfaces_list.append(Interface(**iface_data))
+            except Exception as e: # Catch generic Exception for parsing issues
+                self.logger.error(f"Error converting interface data to Interface model: {iface_data} - {e}")
                 continue
-
 
         debug_var(wireless_only, "wireless_only")
         debug_var(monitor_only, "monitor_only")
         debug_var(is_up_only, "is_up_only")
-        debug_var([i.name for i in interfaces_list], "Available Interfaces Before Filtering (Names)") # Log names for readability
+        debug_var([i.name for i in interfaces_list], "Available Interfaces Before Filtering (Names)") 
 
         filtered_interfaces = interfaces_list
 
         if wireless_only:
-            filtered_interfaces = [i for i in filtered_interfaces if i.is_wireless]
+            # Use attributes from the Interface Pydantic model
+            filtered_interfaces = [i for i in filtered_interfaces if i.driver and i.mode != "ethernet"] # Check for driver and not "ethernet" mode
         if monitor_only:
-            filtered_interfaces = [i for i in filtered_interfaces if i.supports_monitor_mode()]
+            filtered_interfaces = [i for i in filtered_interfaces if i.supports_monitor] # Direct access to supports_monitor
         if is_up_only:
-            filtered_interfaces = [i for i in filtered_interfaces if i.is_up]
+            filtered_interfaces = [i for i in filtered_interfaces if i.is_up] # Direct access to is_up
 
-        debug_var([i.name for i in filtered_interfaces], "Filtered Interfaces (Names)") # Log names for readability
+        debug_var([i.name for i in filtered_interfaces], "Filtered Interfaces (Names)") 
         return filtered_interfaces
 
     def run(self, *args: Any, plugin_name: Optional[str] = None, **kwargs: Any):
@@ -238,7 +235,7 @@ class CapGateRunner:
         self.logger.info("🛑 CapGate Runner Finished")
         return False
 
-    def load_discovery_json(self, path: Optional[str] = None):
+    def load_discovery_json(self, path: Optional[str] = None) -> Optional[dict[str, Any]]:
         """
         Load topology data from discovery.json (default or custom path)
         directly into AppState.discovery_graph.
@@ -249,7 +246,7 @@ class CapGateRunner:
             Path("src/data/topology/discovery.json"),
             Path("/home/nexus/capgate/data/topology/discovery.json"),
         ]
-        loaded_data = {}
+        loaded_data: Dict[str, Any] = {}
         if path:
             p = Path(path)
             if p.exists():
@@ -260,7 +257,7 @@ class CapGateRunner:
         else:
             for p in default_paths:
                 if p.exists():
-                    with p.open("r", encoding="utf-8") as f: # Added encoding
+                    with p.open("r", encoding="utf-8") as f: 
                         loaded_data = json.load(f)
                         self.logger.info(f"Loaded discovery.json from: {p}")
                         break
@@ -268,12 +265,19 @@ class CapGateRunner:
                 self.logger.error("No discovery.json found in default locations.")
         
         if loaded_data:
-            # Assuming discovery.json contains "interfaces" and "devices" directly
-            self.app_state.discovery_graph['interfaces'].update(loaded_data.get("interfaces", {}))
-            self.app_state.discovery_graph['devices'].update(loaded_data.get("devices", {}))
-            self.logger.info(f"Successfully loaded {len(loaded_data.get('interfaces', {}))} interfaces and {len(loaded_data.get('devices', {}))} devices from JSON.")
+            # The AppState.__init__ guarantees discovery_graph is initialized
+            
+            # Update the interfaces and devices within discovery_graph
+            # Use AppState's update methods for thread-safety and internal consistency
+            self.app_state.update_interfaces(loaded_data.get("interfaces", {}))
+            self.app_state.update_devices(loaded_data.get("devices", {}))
+            
+            self.logger.info(
+                "Successfully loaded %d interfaces and %d devices from JSON into AppState.",
+                len(self.app_state.discovery_graph.get('interfaces', {})),
+                len(self.app_state.discovery_graph.get('devices', {}))
+            )
         
-        # Return the loaded data if needed, or simply update state.
         return loaded_data
 
 
@@ -284,7 +288,10 @@ def main():
     try:
         ensure_directories()
         runner = CapGateRunner()
+        # Uncomment the line below if you want to automatically load
+        # a default discovery.json at startup.
+        # runner.load_discovery_json() 
         runner.run(*sys.argv[1:])
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
+        logger.error("An error occurred: %s", e)
         sys.exit(1)
