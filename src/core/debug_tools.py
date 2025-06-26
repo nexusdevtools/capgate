@@ -1,44 +1,45 @@
-# src/core/debug_tools.py
+# core/debug_tools.py
 
-import json
-import traceback
 from typing import Any
 from rich.console import Console
+from rich.pretty import pprint
+
+# Assuming these are the correct imports for your state management
+from core.state_management.context import CapGateContext
+from core.state_management.state import AppState
 
 console = Console()
 
-def debug_var(var: Any, name: str = "var"):
-    """
-    Pretty-print a variable’s name, type, and value.
-    """
-    console.print(f"[bold yellow][DEBUG][/bold yellow] {name} (type={type(var).__name__}): {repr(var)}")
-
-def debug_dict(d: dict[Any, Any], name: str = "dict"):
-    """
-    Print keys and value types of a dictionary.
-    """
-    console.print(f"[bold cyan]🔍 Debugging dict: {name}[/bold cyan]")
-    for k, v in d.items():
-        console.print(f"  [green]{k}[/green] : ({type(v).__name__}) {repr(v)}")
-
-def dump_context(ctx: Any, name: str = "AppContext"):
-    """
-    Safely print AppContext contents.
-    """
-    from core.logger import logger
-    try:
-        output = ctx.as_dict() if hasattr(ctx, "as_dict") else ctx
-        formatted = json.dumps(output, indent=2, default=str)
-        console.print(f"[bold green]🧠 {name} Dump:[/bold green]")
-        console.print(formatted)
-    except Exception as e:
-        logger.error(f"Failed to dump context: {e}")
-        print_exception(e)
+def debug_var(var_value: Any, var_name: str = "Variable"):
+    """Prints a debug message with variable name and value."""
+    console.log(f"[DEBUG] {var_name} (type={type(var_value).__name__}): {var_value!r}") # !r for representation
 
 def print_exception(e: Exception):
+    """Prints a formatted exception traceback."""
+    console.print_exception(show_locals=True)
+
+def dump_context(ctx: CapGateContext, title: str = "AppContext Dump"):
     """
-    Print the full traceback of an exception.
+    Dumps the contents of the CapGateContext and its associated AppState
+    for debugging purposes.
     """
-    console.print("[red bold]⚠ Exception Traceback:[/red bold]")
-    traceback_str = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-    console.print(traceback_str)
+    console.print(f"\n🧠 [bold green]{title}[/bold green]:")
+    
+    # Dump runtime_meta from CapGateContext
+    console.print("[yellow]--- Runtime Metadata (CapGateContext.runtime_meta) ---[/yellow]")
+    pprint(ctx.to_dict()) # ctx.to_dict() gives runtime_meta
+
+    # Dump global AppState (accessed via ctx.state)
+    console.print("\n[yellow]--- Global Application State (CapGateContext.state / AppState) ---[/yellow]")
+    pprint(ctx.state.to_dict()) # ctx.state is the AppState singleton, use its to_dict
+
+    console.print("\n" + "="*80) # Separator for clarity
+
+# You might also want a direct AppState dumper for specific use cases
+def dump_app_state(app_state: AppState, title: str = "AppState Dump"):
+    """
+    Dumps the contents of the AppState object directly.
+    """
+    console.print(f"\n🧠 [bold cyan]{title}[/bold cyan]:")
+    pprint(app_state.to_dict())
+    console.print("\n" + "="*80)

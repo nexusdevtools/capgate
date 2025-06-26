@@ -1,4 +1,4 @@
-# core/state_management/state.py
+# src/core/state_management/state.py
 """
 state.py — Central Application State
 Manages persistent, shared data across CapGate tools and plugins.
@@ -7,47 +7,99 @@ Manages persistent, shared data across CapGate tools and plugins.
 from __future__ import annotations
 from typing import Dict, List, Optional, Union, Any
 import json
-
+from threading import RLock
 
 class AppState:
     """
     Central application state store.
+    All access to its attributes should ideally be via helper methods for thread-safety.
 
     Attributes:
         loaded_plugins (List[str]): Plugins registered by the system.
-        discovery_graph (Optional[Dict]): Live or cached network map.
+        discovery_graph (Optional[Dict]): Live or cached network map ({'interfaces': {}, 'devices': {}}).
         user_config (Dict): User-defined configuration settings.
     """
     def __init__(self):
         self.loaded_plugins: List[str] = []
-        self.discovery_graph: Optional[Dict[str, Any]] = None
+        # Initialize discovery_graph as an empty dict with required keys if it's meant to always exist
+        # This ensures it's never None once AppState is created.
+        self.discovery_graph: Dict[str, Any] = {"interfaces": {}, "devices": {}}
         self.user_config: Dict[str, Any] = {}
+        self._lock: RLock = RLock() # Lock for AppState's attributes
 
-    def to_dict(self) -> Dict[str, Union[List[str], Optional[Dict[str, Any]], Dict[str, Any]]]:
+    # --- Thread-safe attribute access methods for clarity ---
+    # Existing update_interfaces method
+    def update_interfaces(self, interfaces_data: Dict[str, Any]) -> None:
+        """Updates the interfaces within the discovery_graph."""
+        with self._lock:
+            # Update interfaces in discovery_graph
+            self.discovery_graph['interfaces'].update(interfaces_data)
+
+    # <--- CRITICAL ADDITION: update_devices method
+    def update_devices(self, devices_data: Dict[str, Any]) -> None:
+        """Updates the devices within the discovery_graph."""
+        with self._lock:
+            self.discovery_graph['devices'].update(devices_data)
+    def to_dict(self) -> Dict[str, Union[List[str], Dict[str, Any]]]: # Adjusted type hint for discovery_graph
         """Return the full state as a dictionary."""
-        return {
-            "loaded_plugins": self.loaded_plugins,
-            "discovery_graph": self.discovery_graph,
-            "user_config": self.user_config
-        }
+        with self._lock: # Ensure thread-safe read for export
+            return {
+                "loaded_plugins": list(self.loaded_plugins), # Return a copy
+                # Ensure discovery_graph is a dict for consistency, even if it was None.
+                "discovery_graph": dict(self.discovery_graph) if self.discovery_graph else {"interfaces": {}, "devices": {}},
+                "user_config": dict(self.user_config) # Return a copy
+            }
 
     def save_to_file(self, path: str):
         """Persist the current state to a JSON file."""
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(self.to_dict(), f, indent=4)
+        with self._lock: # Ensure thread-safe write
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(self.to_dict(), f, indent=4) # to_dict already handles copying
+            except IOError as e:
+                print(f"Error saving state to file {path}: {e}") # Consider using your logger here
 
     def load_from_file(self, path: str):
         """Load saved state from a JSON file."""
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            self.loaded_plugins = data.get("loaded_plugins", [])
-            self.discovery_graph = data.get("discovery_graph")
-            self.user_config = data.get("user_config", {})
+        with self._lock: # Ensure thread-safe load
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.loaded_plugins = data.get("loaded_plugins", [])
+                    # Ensure discovery_graph is properly initialized from loaded data
+                    loaded_dg = data.get("discovery_graph")
+                    if loaded_dg is not None:
+                        # Ensure loaded_dg keys exist or provide defaults
+                        self.discovery_graph = {
+                            "interfaces": loaded_dg.get("interfaces", {}),
+                            "devices": loaded_dg.get("devices", {})
+                        }
+                    else:
+                        self.discovery_graph = {"interfaces": {}, "devices": {}} # Default empty
+                    self.user_config = data.get("user_config", {})
+            except FileNotFoundError:
+                print(f"State file not found: {path}. Starting with default state.")
+                self.loaded_plugins = []
+                self.discovery_graph = {"interfaces": {}, "devices": {}}
+                self.user_config = {}
+            except json.JSONDecodeError as e:
+                print(f"Error decoding state file {path}: {e}. Starting with default state.")
+                self.loaded_plugins = []
+                self.discovery_graph = {"interfaces": {}, "devices": {}}
+                self.user_config = {}
+            except IOError as e:
+                print(f"Error loading state from file {path}: {e}. Starting with default state.")
+                self.loaded_plugins = []
+                self.discovery_graph = {"interfaces": {}, "devices": {}}
+                self.user_config = {}
 
 
 # Singleton accessor
-_state_instance = AppState()
+_state_instance: Optional[AppState] = None # Explicitly type as Optional
 
 def get_state() -> AppState:
     """Returns the singleton AppState instance."""
+    global _state_instance
+    if _state_instance is None:
+        _state_instance = AppState()
     return _state_instance

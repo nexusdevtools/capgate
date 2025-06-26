@@ -46,7 +46,7 @@ class Device(BaseModel):
     vendor: Optional[str] = None
     signal_strength: Optional[int] = None
     is_router: bool = False
-    last_seen: Optional[float] = None
+    last_seen: Optional[float] = None # Timestamp (float)
     is_active: bool = True
     is_tracked: bool = False
     is_ignored: bool = False
@@ -100,8 +100,10 @@ class Device(BaseModel):
     is_unknown: bool = False
     is_custom: bool = False
 
-    model_config = ConfigDict(extra='allow')  # allow future additions
+    model_config = ConfigDict(extra='allow')
 
     def to_dict(self) -> dict[str, Any]:
-        """Safe export for injection into AppContext or JSON."""
+        """Converts the Device model instance to a dictionary, excluding unset/None values."""
+        # Use model_dump for Pydantic v2. `exclude_none=True` is typically default for `dict()` if Optional
+        # fields are not provided, but explicitly stating it is good.
         return self.model_dump(exclude_none=True)
