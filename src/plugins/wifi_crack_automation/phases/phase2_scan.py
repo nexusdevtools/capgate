@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from core.logger import logger
 # from helpers import shelltools # Not strictly needed if using subprocess.Popen directly
 
-def scan_for_networks(plugin_local_context: Dict[str, Any]) -> Optional[Dict[str, str]]:
+def scan_for_networks(app_context: CapGateContext) -> Optional[Dict[str, str]]:
     """
     Scan nearby Wi-Fi networks using airodump-ng.
     Updates plugin_local_context with target BSSID, channel, and ESSID.
@@ -18,16 +18,16 @@ def scan_for_networks(plugin_local_context: Dict[str, Any]) -> Optional[Dict[str
     logger.info("[Phase 2] Scanning for nearby Wi-Fi networks...")
 
     # CRITICAL: Use the monitor_interface set by Phase 1
-    monitor_interface = plugin_local_context.get("monitor_interface")
+    monitor_interface = app_context.get("monitor_interface")
     if not monitor_interface:
         logger.error("Monitor interface not set in context (expected from Phase 1). Cannot scan.")
         return None
 
-    scan_duration_seconds: int = plugin_local_context.get("scan_duration_seconds", 15) # More descriptive key
-    auto_select: bool = plugin_local_context.get("auto_select", False)
+    scan_duration_seconds: int = app_context.get("scan_duration_seconds", 15) # More descriptive key
+    auto_select: bool = app_context.get("auto_select", False)
     # Example: filter for networks with WPA/WPA2. 'WPA' would catch WPA, WPA2, WPA3.
     # For more specific filtering, this logic would need to be more nuanced.
-    network_security_filter: str = plugin_local_context.get("network_security_filter", "WPA") 
+    network_security_filter: str = app_context.get("network_security_filter", "WPA") 
 
     # Create a temporary file for airodump-ng output prefix
     # delete=False is important because airodump-ng writes to it, and we read it after.
@@ -216,10 +216,10 @@ def scan_for_networks(plugin_local_context: Dict[str, Any]) -> Optional[Dict[str
 
     if selected_target:
         # Update context with individual keys for easier access by subsequent phases
-        plugin_local_context["target_bssid"] = selected_target["bssid"]
-        plugin_local_context["target_channel"] = selected_target["channel"]
-        plugin_local_context["target_essid"] = selected_target["essid_raw"] # Store raw ESSID
-        plugin_local_context["target_privacy"] = selected_target["privacy"] # Store privacy/security info
+        app_context["target_bssid"] = selected_target["bssid"]
+        app_context["target_channel"] = selected_target["channel"]
+        app_context["target_essid"] = selected_target["essid_raw"] # Store raw ESSID
+        app_context["target_privacy"] = selected_target["privacy"] # Store privacy/security info
         
         # For logging/display, use the potentially cleaned ESSID
         logger.info(f"[✓] Target selected: {selected_target['essid']} ({selected_target['bssid']}) on channel {selected_target['channel']}")
