@@ -1,5 +1,6 @@
 # src/plugins/wifi_crack_automation/phases/phase4_crack.py
 
+import os
 from typing import Optional
 
 from core.logger import logger
@@ -23,49 +24,44 @@ def crack_handshake(app_context: CapGateContext) -> bool:
         logger.error("No handshake file available in context for cracking (expected from Phase 3).")
         return False
 
-    # Get target BSSID from context (useful for targeted cracking, though CrackingManager doesn't use it yet)
-    # target_bssid: Optional[str] = app_context.get("target_bssid") # Not directly used in this function's call to CrackingManager
-
-    # Determine wordlist path
     wordlist_path_from_context: Optional[str] = app_context.get("wordlist") # Check if wordlist was set in context
     auto_mode: bool = app_context.get("auto_select_interface", False)
 
+    # CRITICAL CHANGE: Set the new preferred default wordlist path
+    # This path is relative to the CapGate project root, which will be handled by find_wordlist
+    new_default_wordlist = os.path.join(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')),
+        'src', 'wordlists', 'wordlist-top4800-probable.txt'
+    )
+    
     final_wordlist_to_use: Optional[str] = None
-    default_rockyou_path = "/usr/share/wordlists/rockyou.txt" # Base string for rockyou.txt
 
     if wordlist_path_from_context:
         final_wordlist_to_use = wordlist_path_from_context
         logger.info(f"[Phase 4] Using wordlist from context: {final_wordlist_to_use}")
     elif auto_mode:
-        final_wordlist_to_use = default_rockyou_path
+        final_wordlist_to_use = new_default_wordlist
         logger.info(f"[Phase 4] Auto-selecting default wordlist: {final_wordlist_to_use}")
     else:
         try:
-            # Prompt user for wordlist if not in auto-mode and not provided
-            final_wordlist_to_use = input(f"Enter path to wordlist [{default_rockyou_path}]: ").strip() or default_rockyou_path
+            final_wordlist_to_use = input(f"Enter path to wordlist [{new_default_wordlist}]: ").strip() or new_default_wordlist
         except KeyboardInterrupt:
             logger.warning("[Phase 4] User interrupted wordlist prompt. Cracking skipped.")
             app_context.set("password", None)
             app_context.set("key_found", False)
             return False
 
-    # Instantiate the CrackingManager
     cracking_manager = CrackingManager()
-
-    # The CrackingManager.find_wordlist method will now robustly search and decompress.
-    # Its internal logging will indicate if it successfully found a usable path.
     usable_wordlist_path = cracking_manager.find_wordlist(final_wordlist_to_use)
 
     if not usable_wordlist_path:
-        # CrackingManager.find_wordlist already logged an error/warning if not found
         app_context.set("password", None)
         app_context.set("key_found", False)
-        return False # Exit early if no usable wordlist
+        return False
 
-    # Call the abstracted cracking method with the *resolved* wordlist path
     cracked_password = cracking_manager.crack_wpa_handshake(
         handshake_file_path=handshake_file,
-        wordlist_path=usable_wordlist_path # Pass the resolved path
+        wordlist_path=usable_wordlist_path
     )
 
     if cracked_password:
@@ -78,5 +74,3 @@ def crack_handshake(app_context: CapGateContext) -> bool:
         app_context.set("password", None)
         app_context.set("key_found", False)
         return False
-
-# Removed the __main__ block (consistent with other plugin phases)

@@ -1,6 +1,6 @@
 import os
 
-DEFAULT_WORDLIST = "/usr/share/wordlists/rockyou.txt"
+DEFAULT_WORDLIST = "home/nexus/wifite2/wordlist-top4800-probable.txt"
 CAPTURE_DIR = "handshakes"
 POTFILE = os.path.expanduser("~/.hashcat/hashcat.potfile")
 DEFAULT_CAPTURE_FILE = "handshake.pcap"
