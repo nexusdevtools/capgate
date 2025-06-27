@@ -1,5 +1,5 @@
+from typing import Optional, List # Import List
 from pydantic import BaseModel, ConfigDict # Import ConfigDict
-from typing import Optional # Import List
 
 class Interface(BaseModel):
     name: str
@@ -13,7 +13,13 @@ class Interface(BaseModel):
     tx_power: Optional[str] = None # e.g., "22.00 dBm"
     channel_frequency: Optional[str] = None # e.g., "5720 MHz (channel 144), width 40 MHz"
     signal_quality: Optional[int] = None # You had this, leaving it. Maybe SNR or Link quality.
-    
+
+    # CRITICAL ADDITION: Add the is_wireless field
+    is_wireless: bool = False 
+
+    # CRITICAL ADDITION: Add the supported_modes_list field
+    supported_modes_list: List[str] = []
+
     # Flags for capabilities, kept from your original.
     # Note: Consider making these a List[str] like `supported_modes_list: List[str]`
     # and parsing `iw list` to populate it more dynamically,

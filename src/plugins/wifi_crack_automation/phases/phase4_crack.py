@@ -1,11 +1,13 @@
 # src/plugins/wifi_crack_automation/phases/phase4_crack.py
 
-import os
 from typing import Optional
 
 from core.logger import logger
 from core.state_management.context import CapGateContext
 from core.cracking_manager import CrackingManager
+# Import the paths module to get the WORDLISTS_DIR
+from paths import WORDLISTS_DIR
+
 
 def crack_handshake(app_context: CapGateContext) -> bool:
     """
@@ -24,24 +26,44 @@ def crack_handshake(app_context: CapGateContext) -> bool:
         logger.error("No handshake file available in context for cracking (expected from Phase 3).")
         return False
 
-    wordlist_path_from_context: Optional[str] = app_context.get("wordlist") # Check if wordlist was set in context
+    wordlist_path_from_context: Optional[str] = app_context.get("wordlist")
     auto_mode: bool = app_context.get("auto_select_interface", False)
 
-    # CRITICAL CHANGE: Set the new preferred default wordlist path
-    # This path is relative to the CapGate project root, which will be handled by find_wordlist
-    new_default_wordlist = os.path.join(
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')),
-        'src', 'wordlists', 'wordlist-top4800-probable.txt'
-    )
-    
+    # CRITICAL CHANGE: Set the new preferred default wordlist path using WORDLISTS_DIR
+    new_default_wordlist = str(WORDLISTS_DIR / "wordlist-top4800-probable.txt") # Convert Path object to string
+    logger.debug("[Phase 4] New default wordlist path: %s", new_default_wordlist)
+    # Determine the final wordlist to use based on context or user input
+    # If a wordlist was provided in the context, use that; otherwise, prompt the user or use the default.
+    if not handshake_file:
+        logger.error("[Phase 4] No handshake file found in context. Cannot proceed with cracking.")
+        app_context.set("password", None)
+        app_context.set("key_found", False)
+        return False
+    logger.debug("[Phase 4] Handshake file to crack: %s", handshake_file)
+    # Check if a wordlist was provided in the context
+    wordlist_path_from_context = app_context.get("wordlist")
+    logger.debug("[Phase 4] Wordlist path from context: %s", wordlist_path_from_context)
+    # If no wordlist was provided, use the new default wordlist
+    # If auto mode is enabled, use the new default wordlist
+    # Otherwise, prompt the user for a wordlist path
+    # If the user interrupts, skip cracking and set password to None
+    if not wordlist_path_from_context:
+        logger.debug("[Phase 4] No wordlist provided in context, using default or prompting user.")
+    else:
+        logger.debug("[Phase 4] Wordlist provided in context: %s", wordlist_path_from_context)
+    # Determine the final wordlist to use
+    # If a wordlist was provided in the context, use that; otherwise, prompt the user or use the default.
+    # If auto mode is enabled, use the new default wordlist
+    # Otherwise, prompt the user for a wordlist path
+    # If the user interrupts, skip cracking and set password to None
     final_wordlist_to_use: Optional[str] = None
 
     if wordlist_path_from_context:
         final_wordlist_to_use = wordlist_path_from_context
-        logger.info(f"[Phase 4] Using wordlist from context: {final_wordlist_to_use}")
+        logger.info("[Phase 4] Using wordlist from context: %s", final_wordlist_to_use)
     elif auto_mode:
         final_wordlist_to_use = new_default_wordlist
-        logger.info(f"[Phase 4] Auto-selecting default wordlist: {final_wordlist_to_use}")
+        logger.info("[Phase 4] Auto-selecting default wordlist: %s", final_wordlist_to_use)
     else:
         try:
             final_wordlist_to_use = input(f"Enter path to wordlist [{new_default_wordlist}]: ").strip() or new_default_wordlist
@@ -67,7 +89,7 @@ def crack_handshake(app_context: CapGateContext) -> bool:
     if cracked_password:
         app_context.set("password", cracked_password)
         app_context.set("key_found", True)
-        logger.info(f"[✓] Password cracked and stored in context.")
+        logger.info("[✓] Password cracked and stored in context.")
         return True
     else:
         logger.warning("[✘] Password not cracked or found in handshake file.")

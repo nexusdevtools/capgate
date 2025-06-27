@@ -8,11 +8,13 @@ import os
 import re
 import gzip
 import tempfile
-import shlex # <--- Added for run_command fix
+import shlex
 from typing import Optional, List
 
 from core.logger import logger
 from helpers import shelltools
+# CRITICAL FIX: Import the paths module to get the WORDLISTS_DIR
+from paths import WORDLISTS_DIR
 
 
 class CrackingManager:
@@ -58,7 +60,7 @@ class CrackingManager:
         Checks original path, then with common extensions, and decompresses .gz files.
 
         Args:
-            user_provided_path (str): The path provided by the user or default.
+            user_provided_path (str): The initial path provided by the user or as a default.
 
         Returns:
             Optional[str]: The absolute path to a usable (uncompressed) wordlist file, or None.
@@ -71,21 +73,19 @@ class CrackingManager:
         potential_paths.append(user_provided_path)
         
         # Add paths with common extensions if not already present
-        if not user_provided_path.endswith((".txt", ".gz")):
+        if not user_provided_path.lower().endswith((".txt", ".gz")):
             potential_paths.append(f"{user_provided_path}.txt")
             potential_paths.append(f"{user_provided_path}.gz")
 
-        # Add your new dedicated wordlist path and its gzipped variant
-        # Ensure this is an absolute path or relative from where CapGate is typically run
-        capgate_wordlist_base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'wordlists')) # /home/nexus/capgate/src/wordlists
+        # CRITICAL CHANGE: Use the new WORDLISTS_DIR for project-specific wordlists
+        # Assuming wordlist-top4800-probable.txt is directly inside WORDLISTS_DIR
         potential_paths.extend([
-            os.path.join(capgate_wordlist_base, "wordlist-top4800-probable.txt"),
-            os.path.join(capgate_wordlist_base, "wordlist-top4800-probable.txt.gz")
+            str(WORDLISTS_DIR / "wordlist-top4800-probable.txt"),
+            str(WORDLISTS_DIR / "wordlist-top4800-probable.txt.gz")
         ])
 
 
-        # Common Kali Linux rockyou.txt paths
-        # Keep these as fallbacks in case the user specified "rockyou.txt"
+        # Common Kali Linux rockyou.txt paths (keep these for broader compatibility)
         if "rockyou" in user_provided_path.lower() or "/usr/share/wordlists" in user_provided_path.lower():
             potential_paths.extend([
                 "/usr/share/wordlists/rockyou.txt",
@@ -96,7 +96,6 @@ class CrackingManager:
             ])
 
         # Remove duplicates and normalize paths
-        # Using a dict as an ordered set
         unique_paths_dict = {os.path.abspath(p): None for p in potential_paths}
         unique_paths = list(unique_paths_dict.keys())
 
@@ -148,12 +147,11 @@ class CrackingManager:
 
         cracked_password: Optional[str] = None
         try:
-            # Ensure the command is passed as a list of arguments, not a single string
-            cmd_args = ["aircrack-ng", "-w", actual_wordlist_path, handshake_file_path]
+            cmd_args: List[str] = ["aircrack-ng", "-w", actual_wordlist_path, handshake_file_path]
             
-            self.logger.debug(f"[CrackingManager] Executing aircrack-ng: {shlex.join(cmd_args)}") # Use shlex.join for logging
+            self.logger.debug(f"[CrackingManager] Executing aircrack-ng: {shlex.join(cmd_args)}")
             
-            # CRITICAL FIX: Pass cmd_args (list) to run_command, not a joined string
+            # This call should now correctly receive a list of strings
             result_output = shelltools.run_command(cmd_args, require_root=False, check=False) 
 
             if "KEY FOUND!" in result_output:

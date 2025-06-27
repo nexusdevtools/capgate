@@ -9,7 +9,7 @@ import time
 import os
 import tempfile
 import shlex # <--- ADDED for explicit shlex.join in logging.
-from typing import Optional, Dict, Any, Tuple, List # Added List for precise type hints
+from typing import Optional, List # Added List for precise type hints
 
 from core.logger import logger
 from helpers import shelltools
@@ -79,7 +79,7 @@ class CaptureManager:
                 self.logger.warning(f"Could not remove old .cap file {final_cap_file_path}: {e_remove}")
 
 
-        dump_proc: Optional[subprocess.Popen] = None
+        dump_proc: Optional[subprocess.Popen[bytes]] = None
         try:
             # Start airodump-ng in the background to capture traffic
             airodump_cmd: List[str] = [ # Explicitly type as List[str]

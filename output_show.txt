@@ -1,6 +1,0 @@
-✔ Using discovery file: /home/nexus/capgate/data/topology/discovery.json
-📡 ASCII Network Topology Graph:
-
-
-🔗 Connections:
-Exported topology to: exports/topology.png
