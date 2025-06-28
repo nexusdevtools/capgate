@@ -1,8 +1,8 @@
 # src/paths.py
 
 from pathlib import Path
-import os # For os.access and os.W_OK
-import sys # For sys.stderr
+import os
+import sys
 
 # Resolve to the directory containing this 'paths.py' file (which is 'src/')
 THIS_DIR = Path(__file__).resolve().parent
@@ -38,6 +38,12 @@ OUTPUT_DIR = CAPGATE_DATA_DIR / "output"
 # The wordlists directory is also a direct child of src
 WORDLISTS_DIR = PROJECT_ROOT / "src" / "wordlists" # Added for direct access
 
+# --- NEW ADDITIONS FOR WEB SERVER ---
+CAPGATE_WEB_ASSETS_DIR = PROJECT_ROOT / "src" / "web_assets" # Central web assets directory
+CAPGATE_WEB_TEMPLATES_DIR = CAPGATE_WEB_ASSETS_DIR / "templates"
+CAPGATE_WEB_CGI_DIR = CAPGATE_WEB_ASSETS_DIR / "cgi-bin"
+CAPGATE_CREDENTIALS_FILE = CAPGATE_DATA_DIR / "captured_credentials.jsonl" # jsonl for line-delimited JSON
+# --- END NEW ADDITIONS ---
 
 REQUIRED_DIRS = [
     PLUGIN_DIR,
@@ -47,7 +53,10 @@ REQUIRED_DIRS = [
     CAPTURE_DIR,
     TMP_DIR,
     OUTPUT_DIR,
-    WORDLISTS_DIR, # Ensure wordlists directory is created
+    WORDLISTS_DIR,
+    CAPGATE_WEB_ASSETS_DIR, # Ensure the base web assets directory is created
+    CAPGATE_WEB_TEMPLATES_DIR,
+    CAPGATE_WEB_CGI_DIR,
 ]
 
 def ensure_directories():
