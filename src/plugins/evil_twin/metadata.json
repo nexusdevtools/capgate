@@ -1,0 +1,18 @@
+{
+    "name": "evil_twin",
+    "display_name": "Evil Twin Rogue AP Attack",
+    "description": "An advanced Evil Twin attack module that orchestrates low-level tools like hostapd, dnsmasq, and iptables. It creates a convincing rogue Access Point, captures Wi-Fi credentials via a captive portal, and leverages CapGate's intelligence for automated setup and verification, enhancing traditional Evil Twin capabilities.",
+    "version": "0.1.0",
+    "author": "nexusdevtools",
+    "plugin_type": "attack",
+    "cli_args": [
+        {"name": "--target-bssid", "help": "BSSID of the target AP to clone.", "type": "str", "optional": true},
+        {"name": "--target-ssid", "help": "SSID of the target AP to clone.", "type": "str", "optional": true},
+        {"name": "--target-channel", "help": "Channel of the target AP to clone.", "type": "int", "optional": true},
+        {"name": "--ap-iface", "help": "Interface for hosting the Evil Twin AP.", "type": "str", "optional": true},
+        {"name": "--deauth-iface", "help": "Interface for sending deauthentication packets.", "type": "str", "optional": true},
+        {"name": "--verify-iface", "help": "Interface for verifying captured credentials.", "type": "str", "optional": true},
+        {"name": "--internet-iface", "help": "Interface for redirecting internet access (optional).", "type": "str", "optional": true},
+        {"name": "--auto-select", "help": "Automatically select interfaces and target AP.", "type": "bool", "optional": true}
+    ]
+}

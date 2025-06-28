@@ -7,7 +7,7 @@ dependencies = ["typer[all]"]
 requires-python = ">=3.8"
 
 [project.scripts]
-capgate = "capgate.cli.cli:app"
+capgate = "cli.capgate_cli:app"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
