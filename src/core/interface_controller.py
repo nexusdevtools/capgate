@@ -1,197 +1,153 @@
 # src/core/interface_controller.py
 """
-Interface Controller: Provides high-level functions to manage network interface states,
-such as enabling/disabling monitor mode, managing NetworkManager, etc.
+Interface Controller: Provides low-level control over network interfaces,
+including setting monitor mode, restoring original states, and managing
+NetworkManager integration.
 """
 
+import subprocess
+import time
 import re
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 
 from core.logger import logger
-from core.state_management.state import AppState
 from helpers import shelltools
-from db.schemas.interface import Interface
+from core.state_management.state import AppState
+from db.schemas.interface import Interface # Import Interface schema
+
 
 class InterfaceController:
     """
-    Manages network interface states and operations, integrating with AppState.
+    Manages direct control of network interfaces and their modes.
     """
     def __init__(self, app_state: AppState):
         self.app_state = app_state
         self.logger = logger
 
-    def enable_monitor_mode(self, interface_name: str) -> Tuple[Optional[str], bool]:
+    def enable_monitor_mode(self, interface: str) -> Tuple[Optional[str], bool]:
         """
-        Enable monitor mode on the given interface.
-        - Manages NetworkManager to prevent interference.
-        - Tries ip/iw first, then falls back to airmon-ng.
-        - Parses the actual monitor interface name.
-        - Updates the interface's mode in AppState if successful.
-        
+        Sets a given wireless interface to monitor mode.
+        Handles NetworkManager integration.
+
         Args:
-            interface_name (str): The name of the interface to put into monitor mode.
+            interface (str): The name of the wireless interface (e.g., 'wlan0').
 
         Returns:
             Tuple[Optional[str], bool]: A tuple containing:
-                - The name of the new monitor interface (e.g., 'wlan0mon' or 'wlan0') if successful, None otherwise.
-                - A boolean indicating if NetworkManager was set to unmanaged by this function.
+                - The name of the interface in monitor mode (can be original or new 'mon' interface).
+                - True if NetworkManager was managing the interface and was set to unmanaged by this function, False otherwise.
         """
-        actual_monitor_iface_name: Optional[str] = None
-        nm_was_set_unmanaged: bool = False
+        self.logger.info(f"Attempting to enable monitor mode on {interface}...")
 
-        current_iface_data = self.app_state.get_discovery_graph().get("interfaces", {}).get(interface_name)
-        if not current_iface_data or not current_iface_data.get('driver') or current_iface_data.get('mode') == "ethernet":
-            self.logger.error(f"Interface {interface_name} not found or is not a wireless interface in AppState. Cannot enable monitor mode.")
+        # 1. Check NetworkManager status
+        nm_managed_by_us: bool = False
+        try:
+            # Check if NM is managing, and if it's in a connected/activating state
+            nm_status_output = shelltools.run_command(f"nmcli -g GENERAL.STATE,GENERAL.NM-MANAGED dev show {interface}", require_root=True, check=False).strip().lower()
+            
+            # Example output: "10 (unmanaged)\nyes" or "30 (disconnected)\nyes" or "100 (connected)\nyes"
+            # Split by newline and take the "yes"/"no" from the second line (GENERAL.NM-MANAGED)
+            nm_managed_state = nm_status_output.splitlines()[-1] if "\n" in nm_status_output else nm_status_output
+            
+            if "yes" in nm_managed_state or "connected" in nm_status_output or "connecting" in nm_status_output or "activated" in nm_status_output: # Check both state and managed status
+                self.logger.info(f"NetworkManager is managing {interface}. Setting to unmanaged.")
+                shelltools.run_command(["nmcli", "dev", "disconnect", interface], require_root=True, check=False) # Disconnect first
+                shelltools.run_command(["nmcli", "dev", "set", interface, "managed", "no"], require_root=True, check=False)
+                nm_managed_by_us = True
+                time.sleep(1) # Give NetworkManager time to release the interface
+            else:
+                self.logger.info(f"NetworkManager is not actively managing {interface} (was: '{nm_managed_state}').")
+        except Exception as e:
+            self.logger.warning(f"Could not check/unmanage NetworkManager for {interface}: {e}. Proceeding assuming manual management is needed.")
+
+        # 2. Set interface to monitor mode using ip/iw
+        try:
+            self.logger.info(f"Attempting to set {interface} to monitor mode using ip/iw.")
+            shelltools.run_command(["ip", "link", "set", interface, "down"], require_root=True)
+            shelltools.run_command(["iw", "dev", interface, "set", "type", "monitor"], require_root=True)
+            shelltools.run_command(["ip", "link", "set", interface, "up"], require_root=True)
+            
+            time.sleep(1) # Give it a moment to apply changes
+
+            # Verify monitor mode
+            iw_info_result = shelltools.run_command(f"iw dev {interface} info", require_root=True)
+            if "type monitor" in iw_info_result:
+                self.logger.info(f"[✓] {interface} successfully set to monitor mode using ip/iw.")
+                
+                # CRITICAL FIX: Update AppState with the new mode
+                iface_data = self.app_state.get_discovery_graph().get("interfaces", {}).get(interface)
+                if iface_data:
+                    updated_iface = Interface(**iface_data)
+                    updated_iface.mode = 'monitor'
+                    updated_iface.is_up = True # Ensure it's marked as up
+                    self.app_state.update_interfaces({interface: updated_iface.to_dict()})
+                    self.logger.info(f"[✓] AppState updated for {interface}: mode set to 'monitor'.")
+
+                self.logger.info(f"[✓] Monitor mode active on: {interface}. Original NM management was {'yes' if nm_managed_by_us else 'no/other'}.")
+                return interface, nm_managed_by_us
+            else:
+                self.logger.error(f"[✘] Failed to set {interface} to monitor mode. 'type monitor' not found in iw info.")
+                self.restore_interface_state(interface, nm_managed_by_us, interface) # Attempt to revert
+                return None, False
+
+        except FileNotFoundError:
+            self.logger.error("Required command (ip or iw) not found. Please ensure wireless tools are installed.")
+            return None, False
+        except Exception as e:
+            self.logger.error(f"Error setting {interface} to monitor mode: {e}")
+            self.restore_interface_state(interface, nm_managed_by_us, interface) # Attempt to revert
             return None, False
 
-        try:
-            nm_managed_command = f"nmcli -g GENERAL.NM-MANAGED dev show {interface_name}"
-            nm_managed_output = shelltools.run_command_no_check(
-                nm_managed_command, require_root=True
-            ).strip().lower()
-
-            self.logger.debug(f"Output of '{nm_managed_command}': '{nm_managed_output}'")
-
-            if nm_managed_output == "yes":
-                self.logger.info(f"NetworkManager is managing {interface_name}. Setting to unmanaged.")
-                shelltools.run_command(f"nmcli dev set {interface_name} managed no", require_root=True)
-                nm_was_set_unmanaged = True
-            else:
-                self.logger.info(f"NetworkManager is not actively managing {interface_name} (was: '{nm_managed_output}').")
-
-        except Exception as e:
-            self.logger.warning(f"Could not check/modify NetworkManager status for {interface_name}: {e}. Proceeding with caution.")
-
-        try:
-            self.logger.info(f"Attempting to set {interface_name} to monitor mode using ip/iw.")
-            shelltools.run_command(f"ip link set {interface_name} down", require_root=True)
-            shelltools.run_command(f"iw dev {interface_name} set type monitor", require_root=True)
-            shelltools.run_command(f"ip link set {interface_name} up", require_root=True)
-            
-            iw_info = shelltools.run_command(f"iw dev {interface_name} info", require_root=True)
-            if "type monitor" in iw_info.lower():
-                actual_monitor_iface_name = interface_name
-                self.logger.info(f"[✓] {interface_name} successfully set to monitor mode using ip/iw.")
-            else:
-                self.logger.warning(f"ip/iw commands ran for {interface_name}, but mode is not 'monitor'. Current info: {iw_info}")
-                raise Exception("Mode not 'monitor' after ip/iw attempt")
-
-        except Exception as e_iw: 
-            self.logger.warning(f"Setting monitor mode with ip/iw failed for {interface_name} (Error: {e_iw}). Trying airmon-ng...")
-            try:
-                self.logger.info(f"Attempting to set {interface_name} to monitor mode using airmon-ng.")
-                airmon_output = shelltools.run_command(f"airmon-ng start {interface_name}", require_root=True)
-                self.logger.debug(f"airmon-ng start {interface_name} output: {airmon_output}")
-
-                match = re.search(
-                    r"(?:monitor mode enabled on (\w+mon\d*|\w+mon)|(wlan\d+mon))",
-                    airmon_output,
-                    re.IGNORECASE
-                )
-                parsed_name = None
-                if match:
-                    parsed_name = match.group(1) or match.group(2)
-
-                if parsed_name:
-                    actual_monitor_iface_name = parsed_name.strip()
-                    self.logger.info(f"[✓] Monitor mode enabled via airmon-ng. New monitor interface: {actual_monitor_iface_name}.")
-                else:
-                    iw_info_after_airmon = shelltools.run_command(f"iw dev {interface_name} info", require_root=True, check=False)
-                    if "type monitor" in iw_info_after_airmon.lower():
-                        actual_monitor_iface_name = interface_name
-                        self.logger.info(f"[✓] airmon-ng seems to have set {interface_name} to monitor mode directly.")
-                    else:
-                        self.logger.error(f"airmon-ng ran but could not parse monitor interface name from output, and {interface_name} is not in monitor mode.")
-            
-            except Exception as e_airmon:
-                self.logger.error(f"airmon-ng also failed to set monitor mode for {interface_name}. Error: {e_airmon}")
-        
-        finally:
-            # Cleanup for NetworkManager if monitor mode setup FAILED and NM was unmanaged by us
-            if actual_monitor_iface_name is None and nm_was_set_unmanaged:
-                self.logger.info(f"Monitor mode setup failed for {interface_name}. Restoring NetworkManager management as immediate cleanup.")
-                try:
-                    shelltools.run_command(f"nmcli dev set {interface_name} managed yes", require_root=True)
-                    nm_was_set_unmanaged = False # Indicate we've handled the restoration due to failure
-                except Exception as e_nm_restore:
-                    self.logger.error(f"Failed to restore NetworkManager management for {interface_name} after setup failure: {e_nm_restore}")
-
-        if actual_monitor_iface_name:
-            # Get a copy of the current interface data from AppState
-            # Need to re-fetch as `Interface` object to use its methods and then update its dict representation
-            iface_schema_data = self.app_state.get_discovery_graph().get("interfaces", {}).get(interface_name)
-            if iface_schema_data:
-                try:
-                    # Create Pydantic model, update its mode, then convert back to dict
-                    updated_iface = Interface(**iface_schema_data)
-                    updated_iface.mode = "monitor"
-                    self.app_state.update_interfaces({interface_name: updated_iface.to_dict()})
-                    self.logger.info(f"[✓] AppState updated for {interface_name}: mode set to 'monitor'.")
-                except Exception as e:
-                    self.logger.warning(f"Could not update {interface_name} mode in AppState: {e}. Data: {iface_schema_data}")
-            else:
-                self.logger.warning(f"Successfully put {interface_name} into monitor mode, but interface data not found in AppState to update.")
-
-            self.logger.info(f"[✓] Monitor mode active on: {actual_monitor_iface_name}. Original NM management was {'yes' if nm_was_set_unmanaged else 'no/other (not modified or restored yet)'}.")
-        else:
-            self.logger.error(f"[✘] Failed to enable monitor mode for {interface_name} after all attempts.")
-        
-        return actual_monitor_iface_name, nm_was_set_unmanaged
-
-    def restore_interface_state(self, 
-                                original_physical_interface: str, 
-                                nm_was_set_unmanaged: bool, 
-                                monitor_interface_name_final: Optional[str]):
+    def restore_interface_state(self, original_iface_name: str, nm_was_managed: bool, current_monitor_iface_name: str) -> bool:
         """
-        Restores the network interface state after plugin execution.
-        This includes restoring NetworkManager management and stopping monitor interfaces.
+        Restores a wireless interface from monitor mode to its original state.
+        If NetworkManager was managing it, it attempts to return control.
 
         Args:
-            original_physical_interface (str): The name of the original physical interface.
-            nm_was_set_unmanaged (bool): True if NetworkManager was set to unmanaged by the script.
-            monitor_interface_name_final (Optional[str]): The name of the monitor interface that was created/used.
+            original_iface_name (str): The original interface name (e.g., 'wlan0').
+            nm_was_managed (bool): True if NetworkManager was managing it before monitor mode.
+            current_monitor_iface_name (str): The interface name currently in monitor mode (e.g., 'wlan0mon' or 'wlan0').
+
+        Returns:
+            bool: True if restoration was successful, False otherwise.
         """
-        self.logger.info(f"[*] Starting cleanup for interface {original_physical_interface}...")
-
-        # Restore NetworkManager management if it was changed by the script
-        if nm_was_set_unmanaged: # Only restore if we changed it
-            self.logger.info(f"Restoring NetworkManager management for {original_physical_interface}.")
-            try:
-                shelltools.run_command(f"nmcli dev set {original_physical_interface} managed yes", require_root=True)
-                # After setting to managed, NM should ideally bring it up/reconnect.
-                # Explicitly bringing it up might interfere with NM, but often harmless.
-                # shelltools.run_command(f"ip link set {original_physical_interface} up", require_root=True, check=False)
-                self.logger.info(f"NetworkManager management for {original_physical_interface} restored.")
-            except Exception as e_nm_restore:
-                self.logger.error(f"Failed to restore NetworkManager management for {original_physical_interface}: {e_nm_restore}")
+        self.logger.info(f"[*] Starting cleanup for interface {current_monitor_iface_name}...")
         
-        # Stop the monitor interface if it was distinct from the original and was created
-        if monitor_interface_name_final and original_physical_interface and monitor_interface_name_final != original_physical_interface:
-            self.logger.info(f"Attempting to stop monitor interface {monitor_interface_name_final} (if distinct).")
-            try:
-                # Use `airmon-ng stop` as it handles the removal of the VIF
-                shelltools.run_command(f"airmon-ng stop {monitor_interface_name_final}", require_root=True, check=False)
-                self.logger.info(f"Monitor interface {monitor_interface_name_final} stopped.")
-            except Exception as e_stop_mon:
-                self.logger.warning(f"Could not stop monitor interface {monitor_interface_name_final} with airmon-ng: {e_stop_mon}.")
-        elif monitor_interface_name_final == original_physical_interface and monitor_interface_name_final:
-            # If the original interface itself was put into monitor mode (e.g., via ip/iw),
-            # try to set it back to managed mode (or 'auto' for common drivers).
-            self.logger.info(f"Attempting to set {original_physical_interface} back to managed/auto mode.")
-            try:
-                shelltools.run_command(f"iw dev {original_physical_interface} set type managed", require_root=True)
-                shelltools.run_command(f"ip link set {original_physical_interface} up", require_root=True)
-                self.logger.info(f"Interface {original_physical_interface} set back to managed mode.")
-            except Exception as e_revert:
-                self.logger.warning(f"Failed to revert {original_physical_interface} from monitor mode to managed: {e_revert}.")
-        
-        # As a general measure, ensure the original physical interface is up.
-        # This is particularly important if 'ip link set <iface> down' was used.
-        if original_physical_interface:
-             try:
-                 self.logger.info(f"Ensuring original physical interface {original_physical_interface} is up.")
-                 shelltools.run_command(f"ip link set {original_physical_interface} up", require_root=True, check=False)
-             except Exception as e_link_up:
-                 self.logger.warning(f"Failed to ensure link is up for {original_physical_interface}: {e_link_up}")
+        cleanup_success = True
 
-        self.logger.info(f"[*] Cleanup for interface {original_physical_interface} finished.")
+        try:
+            # 1. Set interface type back to managed
+            self.logger.info(f"Attempting to set {current_monitor_iface_name} back to managed/auto mode.")
+            shelltools.run_command(["iw", "dev", current_monitor_iface_name, "set", "type", "managed"], require_root=True, check=False)
+            shelltools.run_command(["ip", "link", "set", current_monitor_iface_name, "up"], require_root=True, check=False)
+            self.logger.info(f"Interface {current_monitor_iface_name} set back to managed mode.")
+
+            # CRITICAL FIX: Update AppState with the restored mode
+            iface_data = self.app_state.get_discovery_graph().get("interfaces", {}).get(current_monitor_iface_name)
+            if iface_data:
+                updated_iface = Interface(**iface_data)
+                updated_iface.mode = 'managed' # Assume managed mode is the desired restore for wireless
+                updated_iface.is_up = True # Ensure it's up
+                self.app_state.update_interfaces({current_monitor_iface_name: updated_iface.to_dict()})
+                self.logger.debug(f"AppState updated for {current_monitor_iface_name}: mode set to 'managed'.")
+            
+            # 2. Return control to NetworkManager if it was managing it
+            if nm_was_managed: # This should be the 'original NM management' status passed in.
+                self.logger.info(f"Restoring NetworkManager management for {current_monitor_iface_name}.")
+                shelltools.run_command(["nmcli", "dev", "set", current_monitor_iface_name, "managed", "yes"], require_root=True, check=False)
+                self.logger.info(f"NetworkManager management for {current_monitor_iface_name} restored.")
+            else:
+                self.logger.info(f"NetworkManager was not managing {current_monitor_iface_name} originally, skipping NM restore.")
+
+
+        except Exception as e:
+            self.logger.warning(f"Failed to revert {current_monitor_iface_name} from monitor mode to managed: {e}. Manual intervention may be required.")
+            cleanup_success = False
+
+        # 3. Ensure the physical interface is up (redundant if nmcli manages, but safe)
+        self.logger.info(f"Ensuring original physical interface {original_iface_name} is up.")
+        shelltools.run_command(["ip", "link", "set", original_iface_name, "up"], require_root=True, check=False)
+        
+        self.logger.info(f"[*] Cleanup for interface {current_monitor_iface_name} finished.")
+        return cleanup_success
+    
