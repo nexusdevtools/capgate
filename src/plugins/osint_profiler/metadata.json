@@ -1,0 +1,18 @@
+{
+    "name": "osint_profiler",
+    "display_name": "OSINT & Credential Intelligence Profiler",
+    "description": "Gathers Open-Source Intelligence (OSINT) and performs automated data breach checks to build target profiles and generate intelligent wordlists for enhanced credential cracking and exploit staging. Feeds discovered intelligence into CapGate's AppState.",
+    "version": "0.1.0",
+    "author": "nexusdevtools",
+    "plugin_type": "intelligence",
+    "cli_args": [
+        {"name": "--target-email", "help": "Specify a target email address to check for data breaches (e.g., 'user@example.com').", "type": "str", "optional": true},
+        {"name": "--target-domain", "help": "Specify a target domain to check for data breaches (e.g., 'example.com').", "type": "str", "optional": true},
+        {"name": "--target-username", "help": "Specify a target username to search for in public leaks.", "type": "str", "optional": true},
+        {"name": "--pwned-api-key", "help": "API key for Have I Been Pwned (HIBP) service for breach checks.", "type": "str", "optional": true, "env_var": "HIBP_API_KEY"},
+        {"name": "--profile-company", "help": "Gather OSINT to build a profile for a specified company name.", "type": "str", "optional": true},
+        {"name": "--output-dir", "help": "Directory to save raw OSINT findings and generated wordlists. Defaults to 'data/osint_profiler_output'.", "type": "str", "optional": true},
+        {"name": "--enrich-appstate", "help": "Flag to automatically update AppState with discovered credentials and profiles.", "type": "bool", "optional": true},
+        {"name": "--generate-wordlist", "help": "Generate a custom wordlist based on profiling results and (optional) AI/ML techniques.", "type": "bool", "optional": true}
+    ]
+}
