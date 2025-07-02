@@ -5,7 +5,7 @@
             "name": "Python: CapGate CLI",
             "type": "debugpy",
             "request": "launch",
-            "module": "cli.cli",
+            "module": "cli.capgate_cli",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
