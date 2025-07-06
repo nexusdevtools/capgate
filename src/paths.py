@@ -1,4 +1,4 @@
-# src/paths.py
+# capgate/src/paths.py
 
 from pathlib import Path
 import os
@@ -29,6 +29,13 @@ CAPGATE_WEB_TEMPLATES_DIR = CAPGATE_WEB_ASSETS_DIR / "templates"
 CAPGATE_WEB_CGI_DIR = CAPGATE_WEB_ASSETS_DIR / "cgi-bin" # This dir is no longer copied from, but good to ensure exists.
 CAPGATE_CREDENTIALS_FILE = CAPGATE_DATA_DIR / "captured_credentials.jsonl"
 
+# --- ADD THESE LINES FOR AGENT AND NEXUSDEVTOOLS PATHS ---
+AGENT_DIR = PROJECT_ROOT / "src" / "agent"
+AGENT_KNOWLEDGE_BASE_DIR = AGENT_DIR / "knowledge_base"
+# Assuming nexusdevtools is a top-level directory directly within your CapGate project root
+NEXUSDEVTOOLS_ROOT_DIR = PROJECT_ROOT / "nexusdevtools"
+# --- END ADDITIONS ---
+
 
 # List of directories that need to be ensured at startup
 REQUIRED_DIRS = [
@@ -43,6 +50,10 @@ REQUIRED_DIRS = [
     CAPGATE_WEB_ASSETS_DIR,
     CAPGATE_WEB_TEMPLATES_DIR,
     # CAPGATE_WEB_CGI_DIR, # This is now specific to web_server_manager's temp root.
+    # --- ADD THESE LINES TO YOUR EXISTING REQUIRED_DIRS LIST ---
+    AGENT_DIR,
+    AGENT_KNOWLEDGE_BASE_DIR,
+    # --- END ADDITIONS ---
 ]
 
 # Make ensure_directories a direct function call
