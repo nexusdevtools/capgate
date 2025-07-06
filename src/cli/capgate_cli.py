@@ -1,10 +1,10 @@
-# src/cli/cli.py
+# capgate/src/cli/capgate_cli.py
 
 import sys
-# Removed json, pathlib, List, Optional, Dict, Any from here as they are imported where needed or from local types
-from typing import List, Optional, Dict, Any # Keep these for now as used in function signatures
+from typing import List, Optional, Dict, Any, Tuple
+import logging
 
-from typer import Typer, Option, Argument, Context # <--- No Depends import here
+from typer import Typer, Option, Argument, Context
 from typer import Typer as TyperType
 
 from rich.console import Console
@@ -12,19 +12,21 @@ from rich.table import Table
 import typer
 
 
-# Import commands/apps
+# Import commands/apps - these are relative imports within src/cli/
 from cli.commands.boot import boot_sequence
 from cli.graph import app as graph_app
 from cli.commands.debug_commands import debug_cli
-from core.plugin_creator import create_plugin
-from core.plugin_loader import PluginLoader
-from runner import CapGateRunner
-from db.schemas.interface import Interface
-from db.schemas.device import Device # Ensure Device is imported if used in other modules indirectly
-app: TyperType = typer.Typer()
-app: typer.Typer = typer.Typer()
 
-app = Typer(
+# Imports for types and core functionality - these are relative to src/
+from core.plugin_creator import create_plugin
+from runner import CapGateRunner # Correct import for CapGateRunner type hint
+from db.schemas.interface import Interface # Correct import for Interface type hint
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
+
+
+app: TyperType = typer.Typer(
     help="""CapGate — Wireless Network Intelligence Toolkit
 ⚡ The network that maps itself.
 """,
@@ -37,24 +39,29 @@ console = Console()
 _mock_mode: bool = False
 _auto_select: bool = False
 
-# Global variable to hold the single CapGateRunner instance
+# Global variable to hold the single CapGateRunner instance, set by main.py
 _runner_instance: Optional[CapGateRunner] = None
 
-# Register graph and debug subcommands
-app.add_typer(graph_app, name="graph")
-app.add_typer(debug_cli, name="debug")
+# --- Function to set the global runner instance (called by root main.py) ---
+def set_global_runner(runner: CapGateRunner):
+    """Sets the globally managed CapGateRunner instance for the CLI."""
+    global _runner_instance
+    _runner_instance = runner
+    logger.info("CapGateRunner instance injected into CLI.")
 
 # --- Helper to get the runner instance ---
 def get_global_runner() -> CapGateRunner:
     """Returns the globally managed CapGateRunner instance."""
     global _runner_instance
     if _runner_instance is None:
-        # This branch should ideally not be hit if main_callback always runs first
-        # But it's a safeguard for direct command calls without a full Typer app run.
-        # In a real app, you'd ensure main_callback always sets it.
-        _runner_instance = CapGateRunner(cli_state={"mock_mode": _mock_mode, "auto_select": _auto_select})
+        logger.error("CapGateRunner instance not initialized in CLI. Please run CapGate via its root main.py.")
+        raise RuntimeError("CapGateRunner not initialized. Critical CLI operations cannot proceed.")
     return _runner_instance
-# --- End Helper ---
+
+
+# Register graph and debug subcommands
+app.add_typer(graph_app, name="graph")
+app.add_typer(debug_cli, name="debug")
 
 
 @app.callback(invoke_without_command=True)
@@ -62,18 +69,22 @@ def main_callback(ctx: Context,
                   mock: bool = Option(False, "--mock", help="Enable mock mode"),
                   auto: bool = Option(False, "--auto", help="Auto-select plugin options")):
     """
-    Main CLI entrypoint. Initializes global CLI options and the CapGateRunner.
+    Main CLI entrypoint. Initializes global CLI options.
+    The CapGateRunner is now initialized by the root main.py and injected via set_global_runner.
     """
-    global _mock_mode, _auto_select, _runner_instance
+    global _mock_mode, _auto_select
     _mock_mode = mock
     _auto_select = auto
 
-    # Initialize the single CapGateRunner instance here
-    # This ensures AppState is set up and scanners run once at CLI startup
-    _runner_instance = CapGateRunner(cli_state={
+    # The _runner_instance is expected to be set by main.py BEFORE this callback runs.
+    # We now just update its state if it exists.
+    runner = get_global_runner() # This will raise an error if runner is None
+    runner.cli_state.update({
         "mock_mode": _mock_mode,
         "auto_select": _auto_select
     })
+    logger.info(f"CLI options applied to runner: mock={_mock_mode}, auto={_auto_select}")
+
 
     if ctx.invoked_subcommand is None:
         boot_sequence()
@@ -85,7 +96,7 @@ def boot():
 
 @app.command()
 def version():
-    """Display the current version of CapGate."""
+    """Display the current current version of CapGate."""
     typer.echo("CapGate v0.1.0")
 
 @app.command()
@@ -180,12 +191,44 @@ def create_plugin_command(name: str,
     Generate a plugin using the boilerplate template.
     """
     try:
-        # This function might need CapGateRunner if it writes to config, etc.
-        # But for now, assumes it just creates files.
         create_plugin(name, author) 
         console.print(f"✅ Plugin created at: [yellow]src/plugins/{name}[/yellow]")
     except Exception as e:
         console.print(f"[red]❌ Error:[/red] {e}")
 
-if __name__ == "__main__":
-    app()
+
+# --- New Typer commands for the Agent ---
+# Ensure these imports use direct module paths relative to `src/`
+from agent.mod_coor import ask_capgate_agent, start_capgate_agent_interactive_session, index_capgate_knowledge
+
+@app.command("agent-ask", help="Ask the MCP AI Agent a question or give it a task.")
+def agent_ask_command(query: str = Argument(..., help="The question or task for the AI agent.")):
+    """
+    Ask the MCP AI Agent a question or give it a task.
+    """
+    logger.info(f"CLI: Asking agent: {query}")
+    print(f"\n--- Asking MCP Agent ---\n")
+    response = ask_capgate_agent(query)
+    print(f"\n--- MCP Agent Response ---\n{response}\n--------------------------")
+
+@app.command("agent-interactive", help="Start an interactive chat session with the MCP AI Agent.")
+def agent_interactive_command():
+    """
+    Start an interactive chat session with the MCP AI Agent.
+    """
+    logger.info("CLI: Starting agent interactive session.")
+    start_capgate_agent_interactive_session()
+
+@app.command("agent-index", help="Rebuild the MCP AI Agent's knowledge base.")
+def agent_index_command():
+    """
+    Rebuild the MCP AI Agent's knowledge base.
+    """
+    logger.info("CLI: Requesting agent knowledge re-indexing.")
+    print("\n--- Rebuilding Agent Knowledge Base ---")
+    index_capgate_knowledge()
+    print("--- Agent Knowledge Base Rebuilding Initiated. Check logs. ---")
+
+
+# REMOVE the if __name__ == "__main__": app() block from this file.
+# This file will no longer be the direct entry point.
