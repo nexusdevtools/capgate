@@ -4,12 +4,12 @@ Created on ${created_at}
 Author: ${author}
 """
 
-from core.context import AppContext
+from core.state_management.context import CapGateContext
 from core.logger import logger
 
 from typing import Any
 
-def run(ctx: AppContext, *args: Any, **kwargs: Any):
+def run(ctx: CapGateContext, *args: Any, **kwargs: Any):
     logger.info("Running ${plugin_name} plugin...")
     logger.info(f"Available interfaces: {ctx.get('interfaces')}")
     logger.info(f"Args: {args} | Kwargs: {kwargs}")

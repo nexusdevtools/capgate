@@ -3,6 +3,8 @@
 import sys
 from typing import List, Optional, Dict, Any, Tuple
 import logging
+import subprocess
+from pathlib import Path
 
 from typer import Typer, Option, Argument, Context
 from typer import Typer as TyperType
@@ -11,16 +13,18 @@ from rich.console import Console
 from rich.table import Table
 import typer
 
+from paths import PROJECT_ROOT # Ensure PROJECT_ROOT is imported
+
 
 # Import commands/apps - these are relative imports within src/cli/
-from cli.commands.boot import boot_sequence
-from cli.graph import app as graph_app
-from cli.commands.debug_commands import debug_cli
+from .commands.boot import boot_sequence
+from .graph import app as graph_app
+from .commands.debug_commands import debug_cli
 
 # Imports for types and core functionality - these are relative to src/
 from core.plugin_creator import create_plugin
-from runner import CapGateRunner # Correct import for CapGateRunner type hint
-from db.schemas.interface import Interface # Correct import for Interface type hint
+from runner import CapGateRunner
+from db.schemas.interface import Interface
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -76,9 +80,7 @@ def main_callback(ctx: Context,
     _mock_mode = mock
     _auto_select = auto
 
-    # The _runner_instance is expected to be set by main.py BEFORE this callback runs.
-    # We now just update its state if it exists.
-    runner = get_global_runner() # This will raise an error if runner is None
+    runner = get_global_runner()
     runner.cli_state.update({
         "mock_mode": _mock_mode,
         "auto_select": _auto_select
@@ -107,7 +109,7 @@ def interfaces(wireless_only: bool = Option(False, "--wireless", "-w"),
     List network interfaces, filtered by type or mode.
     """
     console.print("\n[bold green]🔍 Scanning for interfaces...[/bold green]")
-    runner = get_global_runner() # Get the global runner instance
+    runner = get_global_runner()
     interfaces: List[Interface] = runner.get_interfaces(wireless_only, monitor_only, up_only)
 
     if not interfaces:
@@ -140,12 +142,12 @@ def interfaces(wireless_only: bool = Option(False, "--wireless", "-w"),
 
     console.print(table)
 
-@app.command()
+@app.command("plugins")
 def plugins():
     """
     List all available CapGate plugins.
     """
-    runner = get_global_runner() # Get the global runner instance
+    runner = get_global_runner()
     plugins = runner.plugin_loader.plugins 
 
     if not plugins:
@@ -175,7 +177,7 @@ def run_command(plugin_name: str,
     Run a plugin with optional arguments.
     """
     console.print(f"[bold green]🚀 Running plugin:[/bold green] {plugin_name}")
-    runner = get_global_runner() # Get the global runner instance
+    runner = get_global_runner()
     
     plugin_args = plugin_args or []
 
@@ -198,7 +200,6 @@ def create_plugin_command(name: str,
 
 
 # --- New Typer commands for the Agent ---
-# Ensure these imports use direct module paths relative to `src/`
 from agent.mod_coor import ask_capgate_agent, start_capgate_agent_interactive_session, index_capgate_knowledge
 
 @app.command("agent-ask", help="Ask the MCP AI Agent a question or give it a task.")
@@ -228,6 +229,78 @@ def agent_index_command():
     print("\n--- Rebuilding Agent Knowledge Base ---")
     index_capgate_knowledge()
     print("--- Agent Knowledge Base Rebuilding Initiated. Check logs. ---")
+
+
+# --- NEW: Docs Generation Typer Sub-app ---
+docs_app = Typer(
+    help="Commands for managing CapGate documentation.",
+    invoke_without_command=False # Ensure a subcommand is always invoked
+)
+
+@docs_app.command("build")
+def docs_build_command(
+    output_dir: Path = Option(
+        PROJECT_ROOT / "docs" / "pdoc_output", # Default output path
+        "--output", "-o", help="Directory to save the generated documentation."
+    ),
+    # REMOVED: format: str = Option(...) because pdoc v13+ doesn't use --format for markdown
+    module_path: Path = Option(
+        PROJECT_ROOT / "src", # Default module path (CapGate's source)
+        "--module", "-m", help="Path to the module/package to document."
+    )
+):
+    """
+    Builds documentation for CapGate's source code using pdoc.
+    (Outputs HTML by default with pdoc v13+).
+    """
+    # REMOVED: format validation if format option is removed.
+
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Construct the pdoc command for pdoc v13+
+    # pdoc uses the module path relative to where it's run, or it needs the Python path set correctly.
+    # It's safer to provide the full path to the module.
+    pdoc_command = [
+        sys.executable, "-m", "pdoc", # Use python -m pdoc for venv compatibility
+        str(module_path), # Path to the module/package (e.g., 'src/')
+        "--output-directory", str(output_dir), # Correct argument for output directory
+        # REMOVED: "--overwrite" because it's no longer a valid argument and is default behavior
+    ]
+    
+    console.print(f"[bold green]📚 Building documentation with pdoc...[/bold green]")
+    console.print(f"  Source: [yellow]{module_path}[/yellow]")
+    console.print(f"  Output: [yellow]{output_dir} (HTML)[/yellow]") # Clarify output is HTML
+    logger.info(f"Running pdoc command: {' '.join(pdoc_command)}")
+
+    try:
+        process = subprocess.run(pdoc_command, capture_output=True, text=True, check=True)
+        console.print("[green]✅ Documentation built successfully.[/green]")
+        if process.stdout:
+            logger.debug(f"pdoc stdout:\n{process.stdout}")
+        if process.stderr:
+            logger.warning(f"pdoc stderr:\n{process.stderr}")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error building documentation:[/red] {e.stderr}")
+        logger.error(f"pdoc command failed: {e.cmd}\n{e.stderr}")
+        raise typer.Exit(code=1)
+    except FileNotFoundError:
+        console.print("[red]❌ Error:[/red] `pdoc` command not found. Ensure `pdoc` is installed in your virtual environment (`pip install pdoc`).")
+        logger.error("pdoc command not found.")
+        raise typer.Exit(code=1)
+
+# Add the new docs_app as a subcommand to the main app
+app.add_typer(docs_app, name="docs")
+
+@app.command("dev", hidden=True)
+def dev():
+    """
+    Development helper function to run the CLI app.
+    This is for development convenience only.
+    """
+    # This function is not intended to be used in production.
+    # It is here to allow running the CLI directly during development.
+    app()
 
 
 # REMOVE the if __name__ == "__main__": app() block from this file.
