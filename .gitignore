@@ -195,3 +195,4 @@ cython_debug/
 
 # Git LFS
 src/agent/knowledge_base/chroma.sqlite3src/agent/knowledge_base/chroma.sqlite3
+src/agent/knowledge_base/chroma.sqlite3
