@@ -3,9 +3,9 @@
 from typing import Optional # Keep for type hints
 # Removed subprocess, os, time imports - now handled by CaptureManager
 
-from core.logger import logger
-from core.state_management.context import CapGateContext # Import CapGateContext
-from core.capture_manager import CaptureManager # Import the new CaptureManager
+from base.logger import logger
+from base.state_management.context import CapGateContext # Import CapGateContext
+from base.capture_manager import CaptureManager # Import the new CaptureManager
 
 def capture_handshake(app_context: CapGateContext) -> bool:
     """

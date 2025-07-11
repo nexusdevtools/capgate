@@ -10,7 +10,7 @@ import time
 import shlex
 from typing import Optional, List, Dict, Tuple
 
-from core.logger import logger
+from base.logger import logger
 from helpers import shelltools
 from paths import CAPGATE_CONFIG_DIR # Only import the constant, not the function
 

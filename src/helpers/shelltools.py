@@ -7,7 +7,7 @@ import shlex
 import subprocess
 from typing import Optional, Union, List # Import Union and List
 
-from core.logger import logger # Assuming logger is accessible
+from base.logger import logger # Assuming logger is accessible
 
 def is_root() -> bool:
     """Checks if the current user is root."""

@@ -6,7 +6,7 @@ from typing import Optional, Any # Ensure Any is imported for dict[str, Any]
 from rich.console import Console
 import typer
 
-from core.graphs.topology import TopologyGraph
+from base.graphs.topology import TopologyGraph
 
 # Initialize the CLI app and rich console
 app = typer.Typer(help="🧠 CapGate Network Topology Graph Commands")

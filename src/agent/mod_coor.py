@@ -2,7 +2,7 @@
 
 import os
 import chromadb
-import logging
+from base.logger import logger
 from pathlib import Path
 from typing import Iterator, Protocol, Optional
 

@@ -4,8 +4,8 @@ Created on ${created_at}
 Author: ${author}
 """
 
-from core.state_management.context import CapGateContext
-from core.logger import logger
+from base.state_management.context import CapGateContext
+from base.logger import logger
 
 from typing import Any
 

@@ -4,12 +4,12 @@ import os
 from typing import Dict, Any, Optional, List
 
 # Core CapGate imports
-from core.logger import logger
-from core.state_management.context import CapGateContext # Use the main CapGateContext
-from core.state_management.state import AppState # Access AppState via CapGateContext.state
+from base.logger import logger
+from base.state_management.context import CapGateContext # Use the main CapGateContext
+from base.state_management.state import AppState # Access AppState via CapGateContext.state
 
 # New core component for interface control
-from core.interface_controller import InterfaceController # Import the new controller
+from base.interface_controller import InterfaceController # Import the new controller
 
 from db.schemas.interface import Interface # Use the official Interface schema
 # Removed imports from plugins.wifi_crack_automation.utils.interface

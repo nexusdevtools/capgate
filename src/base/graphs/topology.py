@@ -17,8 +17,8 @@ from rich.tree import Tree
 
 from networkx import Graph # Keep this import, it's used for type hinting `self.graph: nx.Graph`
 
-from core.state_management.context import get_context 
-from core.debug_tools import dump_context, print_exception
+from base.state_management.context import get_context 
+from base.debug_tools import dump_context, print_exception
 from db.schemas.interface import Interface
 from db.schemas.device import Device
 

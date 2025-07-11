@@ -16,7 +16,7 @@ class LoggerManager:
     - Tagging by plugin/component
     """
 
-    def __init__(self, name="capgate", log_dir="logs", level="VERBOSE", silent=False):
+    def __init__(self, name: str = "capgate", log_dir: str = "logs", level: str = "VERBOSE", silent: bool = False):
         self.name = name
         self.silent = silent
         self.log_dir = Path(__file__).resolve().parent.parent / log_dir

@@ -2,8 +2,8 @@
 
 import json
 import typer
-from core.state_management.state import get_state
-from core.state_management.context import get_context
+from base.state_management.state import get_state
+from base.state_management.context import get_context
 
 debug_cli = typer.Typer(help="🧩 Inspect internal CapGate state and context")
 

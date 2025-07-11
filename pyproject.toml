@@ -3,14 +3,47 @@ name = "capgate"
 version = "0.1.0"
 description = "CapGate - Wireless Attack Automation Toolkit"
 authors = [{name = "Eric Nash", email = "enash8@my.chemeketa.edu"}]
-dependencies = ["typer[all]"]
+readme = "README.md" # Assuming you have a README.md at the root
 requires-python = ">=3.8"
+license = {file = "LICENSE"} # Assuming you have a LICENSE file
+
+# Direct dependencies for your project. Pip will handle transitive dependencies.
+# This list is more focused than a `pip freeze` and aligns with our `pip install` command.
+dependencies = [
+    "typer[all]", # Includes click, rich, etc.
+    "rich", # Explicitly for Console and Table usage, though Typer[all] usually pulls it
+    "scapy", # For network operations
+    "psutil", # For process management
+    "python-dotenv", # For environment variables
+    "llama-index-core", # Core LlamaIndex library
+    "llama-index-llms-ollama", # Ollama integration for LlamaIndex
+    "llama-index-vector-stores-chroma", # ChromaDB integration for LlamaIndex
+    "llama-index-embeddings-huggingface", # HuggingFace embedding models for LlamaIndex
+    "chromadb", # The vector database itself
+    "pydantic", # For data validation and schemas (used by LlamaIndex and your db/schemas)
+    "httpx", # HTTP client for async operations (dependency of LlamaIndex/Ollama)
+    "pdoc", # For documentation generation
+    # Add any other top-level direct dependencies here that CapGate explicitly uses.
+]
 
 [project.scripts]
-capgate = "cli.capgate_cli:app"
+# This defines the 'capgate' command line entry point.
+# It points to the `root_app` object inside your `capgate.py` file.
+capgate = "capgate:root_app"
 
 [tool.setuptools]
+# This tells setuptools that your source code is under the 'src' directory.
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
+# This tells setuptools to look for packages inside the 'src' directory.
 where = ["src"]
+
+# Optional: Configuration for black formatter (as per your settings.json)
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312'] # Adjust based on your python versions
+
+# Optional: Pytest configuration
+[tool.pytest.ini_options]
+pythonpath = ["src"] # Add src to python path for pytest discovery

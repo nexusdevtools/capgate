@@ -8,7 +8,7 @@ import subprocess
 import shlex
 from typing import List
 
-from core.logger import logger
+from base.logger import logger
 from helpers import shelltools
 
 

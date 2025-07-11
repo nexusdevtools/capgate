@@ -4,8 +4,8 @@ import time
 import subprocess
 from typing import List, Tuple
 
-from core.logger import logger
-from core.state_management.state import AppState # <--- CRITICAL CHANGE: Import AppState
+from base.logger import logger
+from base.state_management.state import AppState # <--- CRITICAL CHANGE: Import AppState
 from db.schemas.device import Device # Import your Pydantic schema
 
 def parse_arp_table() -> List[Tuple[str, str]]:
@@ -73,8 +73,8 @@ def scan_devices_from_arp_table_and_update_state(app_state: AppState):
 # <--- CRITICAL CHANGE: Updated __main__ block for standalone testing
 if __name__ == "__main__":
     # In a standalone run, get the AppState singleton
-    from core.state_management.state import get_state
-    from core.debug_tools import dump_app_state # Assuming dump_app_state is in debug_tools
+    from base.state_management.state import get_state
+    from base.debug_tools import dump_app_state # Assuming dump_app_state is in debug_tools
 
     test_app_state = get_state()
     scan_devices_from_arp_table_and_update_state(test_app_state)

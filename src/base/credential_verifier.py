@@ -9,7 +9,7 @@ import time
 import shlex
 from typing import Optional, List
 
-from core.logger import logger
+from base.logger import logger
 from helpers import shelltools # For run_command
 
 

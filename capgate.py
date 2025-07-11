@@ -16,7 +16,7 @@ CAPGATE_ROOT_DIR = Path(__file__).parent.resolve()
 load_dotenv(dotenv_path=CAPGATE_ROOT_DIR / '.env')
 
 
-import logging
+from base.logger import logger
 import subprocess
 import signal
 import time

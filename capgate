@@ -2,15 +2,14 @@
 # This script is the main entry point for CapGate CLI commands.
 # It ensures the application is run with sudo and uses the correct Python virtual environment.
 
-# Get the directory where this script (capgate) is located
-# This will be /home/nexus/capgate/
+# Get the directory where this script is located (now /home/nexus/nexusdevtools/)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Path to your virtual environment's python executable
 PYTHON_EXEC="${SCRIPT_DIR}/.venv/bin/python"
 
-# Path to your main.py application entry point
-MAIN_APP="${SCRIPT_DIR}/main.py"
+# Path to your new CapGate main entry file
+MAIN_APP="${SCRIPT_DIR}/capgate.py" # Changed from main.py to capgate.py
 
 # Check if the Python executable exists
 if [ ! -f "$PYTHON_EXEC" ]; then
@@ -19,13 +18,13 @@ if [ ! -f "$PYTHON_EXEC" ]; then
     exit 1
 fi
 
-# Check if main.py exists
+# Check if capgate.py exists
 if [ ! -f "$MAIN_APP" ]; then
-    echo "Error: main.py not found at $MAIN_APP" >&2
-    echo "Please ensure main.py is in the root of your CapGate project: $SCRIPT_DIR/" >&2
+    echo "Error: capgate.py not found at $MAIN_APP" >&2
+    echo "Please ensure capgate.py is in the root of your project: $SCRIPT_DIR/" >&2
     exit 1
 fi
 
-# Execute main.py with sudo, preserving current environment variables (-E),
+# Execute capgate.py with sudo, preserving current environment variables (-E),
 # and pass all arguments ($@) from the command line.
 sudo -E "$PYTHON_EXEC" "$MAIN_APP" "$@"

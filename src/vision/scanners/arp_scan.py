@@ -5,7 +5,7 @@ from scapy.layers.l2 import ARP, Ether
 from scapy.all import srp # srp is the send-receive function in Scapy
 
 # Assuming get_logger is replaced by direct logger instance from core.logger
-from core.logger import logger # <--- Updated import for logger
+from base.logger import logger # <--- Updated import for logger
 
 
 def arp_scan(interface: str, target_range: str = "192.168.1.0/24") -> List[Dict[str, str]]:

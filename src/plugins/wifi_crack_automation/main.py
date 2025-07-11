@@ -6,11 +6,11 @@ import sys
 import os
 
 # Core CapGate imports
-from core.logger import logger
+from base.logger import logger
 # Removed direct shelltools import from here unless specifically needed outside InterfaceController/scanners
 # from helpers import shelltools 
-from core.state_management.context import CapGateContext
-from core.interface_controller import InterfaceController
+from base.state_management.context import CapGateContext
+from base.interface_controller import InterfaceController
 
 # Imports for phases (these phases will need refactoring next!)
 from plugins.wifi_crack_automation.phases.phase1_interface import select_interface
@@ -102,7 +102,7 @@ def run(app_context: CapGateContext, *plugin_args: str):
             logger.error(f"\n[✘] FAILURE: [PLUGIN {plugin_name}] Crack unsuccessful or not attempted.")
 
     except Exception as e:
-        from core.debug_tools import print_exception
+        from base.debug_tools import print_exception
         print_exception(e, f"[PLUGIN {plugin_name}] An unexpected error occurred during execution")
         return False
 

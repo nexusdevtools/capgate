@@ -5,13 +5,13 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Tuple
 import subprocess
 import os
-import logging
+from base.logger import logger
 from pathlib import Path # Required for Path objects in type hints and comparisons
 
 # Import directly from the single source of truth for paths
 from paths import PROJECT_ROOT, NEXUSDEVTOOLS_ROOT_DIR, AGENT_KNOWLEDGE_BASE_DIR
 # Import CapGate's core logger for consistent logging
-from core.logger import logger as capgate_core_logger # Assuming core.logger provides a configured logger
+from base.logger import logger as capgate_core_logger # Assuming core.logger provides a configured logger
 
 logger = logging.getLogger(__name__) # Logger for this specific module
 

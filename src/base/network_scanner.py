@@ -11,7 +11,7 @@ import os
 import csv # For more robust CSV parsing
 from typing import Dict, Any, Optional, List
 
-from core.logger import logger
+from base.logger import logger
 
 class NetworkScanner:
     """

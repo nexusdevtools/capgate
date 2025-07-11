@@ -2,9 +2,9 @@
 
 from typing import Dict, Optional, List
 
-from core.logger import logger
-from core.state_management.context import CapGateContext # Import CapGateContext
-from core.network_scanner import NetworkScanner # Import the new NetworkScanner
+from base.logger import logger
+from base.state_management.context import CapGateContext # Import CapGateContext
+from base.network_scanner import NetworkScanner # Import the new NetworkScanner
 
 def scan_for_networks(app_context: CapGateContext) -> Optional[Dict[str, str]]:
     """

@@ -1,16 +1,263 @@
 {
     "version": "0.2.0",
     "configurations": [
+        // --- Core Application Launch Modes ---
         {
-            "name": "Python: CapGate CLI",
-            "type": "debugpy",
+            "name": "CapGate: Start Dev Mode (Interactive)",
+            "type": "python",
             "request": "launch",
-            "module": "cli.capgate_cli",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "dev" // The command to enter interactive development mode
+            ],
             "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": []
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: Root Launch (No Command)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [], // No command, will show help and initialize core app
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+
+        // --- Core CLI Commands ---
+        {
+            "name": "CapGate: boot",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "boot"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: version",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "version"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: interfaces (All)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "interfaces"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: interfaces (Wireless Up)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "interfaces",
+                "--wireless",
+                "--up"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: interfaces (Monitor Only)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "interfaces",
+                "--monitor"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: plugins",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "plugins"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: run (Example Plugin)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "run",
+                "el_topo" // Replace with the actual plugin name you want to run
+                // "arg1", "arg2" // Add plugin arguments as needed
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: create-plugin",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "create-plugin",
+                "MyNewPlugin", // Name of the plugin to create
+                "--author", "Nexus"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: orchestrate-network-audit",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "orchestrate-network-audit",
+                "wlan0" // Replace with the actual interface name
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+
+        // --- AI Agent Commands ---
+        {
+            "name": "CapGate: agent-ask",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "agent-ask",
+                "How does the CapGateRunner class manage application state and context?" // Your question for the agent
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: agent-interactive",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "agent-interactive"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: agent-index",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "agent-index"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+
+        // --- Docs Commands ---
+        {
+            "name": "CapGate: docs build (HTML to nexusdevtools)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "docs",
+                "build",
+                "--output", "${workspaceFolder}/nexusdevtools" // Output docs to project root's nexusdevtools dir
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: docs build (HTML to project docs/pdoc_output)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "docs",
+                "build",
+                "--output", "${workspaceFolder}/docs/pdoc_output" // Standard output dir for docs
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+
+        // --- Debug Sub-Apps (graph and debug_cli) ---
+        // Note: These launch the entire Typer app, then pass specific subcommand args.
+        // You'll need to manually adjust args to specify which specific command within graph/debug.
+        {
+            "name": "CapGate: graph (Help)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "graph",
+                "--help" // Show help for the graph subcommand
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "CapGate: debug (Help)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/capgate.py",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "debug",
+                "--help" // Show help for the debug subcommand
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }

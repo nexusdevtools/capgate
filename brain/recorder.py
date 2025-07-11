@@ -5,8 +5,8 @@ import os
 import time
 from typing import Optional, List
 from capgate_types.core.context_types import EventLogEntry
-from core.context import AppContext
-from core.logger import logger
+from base.context import AppContext
+from base.logger import logger
 
 
 DEFAULT_OUTPUT_DIR = "/home/nexus/capgate/data/brain_feed"

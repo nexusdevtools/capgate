@@ -8,9 +8,9 @@ import json
 import time
 from typing import Dict, Any, Optional, List, Callable
 
-from core.logger import logger
-from core.state_management.context import CapGateContext
-from core.state_management.state import AppState
+from base.logger import logger
+from base.state_management.context import CapGateContext
+from base.state_management.state import AppState
 from paths import CAPGATE_DATA_DIR # Assuming CAPGATE_DATA_DIR is defined in paths.py
 
 class OSINTProfiler:
@@ -264,7 +264,7 @@ def run(app_context: CapGateContext, *plugin_args: str):
             logger.warning("[PLUGIN OSINT Profiler] Profiling finished with issues.")
 
     except Exception as e:
-        from core.debug_tools import print_exception
+        from base.debug_tools import print_exception
         print_exception(e, "[PLUGIN OSINT Profiler] An unexpected error occurred during execution")
         logger.error(f"[PLUGIN OSINT Profiler] Plugin failed due to an unexpected error: {e}")
         profiler_succeeded = False

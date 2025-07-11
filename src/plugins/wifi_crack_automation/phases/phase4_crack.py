@@ -2,9 +2,9 @@
 
 from typing import Optional
 
-from core.logger import logger
-from core.state_management.context import CapGateContext
-from core.cracking_manager import CrackingManager
+from base.logger import logger
+from base.state_management.context import CapGateContext
+from base.cracking_manager import CrackingManager
 # Import the paths module to get the WORDLISTS_DIR
 from paths import WORDLISTS_DIR
 

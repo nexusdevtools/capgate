@@ -5,7 +5,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Dict, Any, List, Optional
 
-from core.logger import get_logger
+from base.logger import get_logger
 my_logger = get_logger("my_submodule")
 
 

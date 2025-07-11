@@ -10,8 +10,8 @@ import time
 import shlex
 from typing import Optional, List, Dict, Any # Added List import explicitly
 
-from core.logger import logger
-from core.state_management.state import AppState
+from base.logger import logger
+from base.state_management.state import AppState
 from helpers import shelltools
 from db.schemas.interface import Interface
 

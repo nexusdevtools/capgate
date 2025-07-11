@@ -17,7 +17,7 @@ from typing import Optional, Dict, Any, Callable, Tuple, Union, cast # <--- CRIT
 from flask import Flask, request, send_from_directory, redirect, Response, make_response
 
 
-from core.logger import logger
+from base.logger import logger
 from paths import CAPGATE_WEB_TEMPLATES_DIR, CAPGATE_CREDENTIALS_FILE
 
 

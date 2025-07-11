@@ -2,7 +2,7 @@
 
 import sys
 from typing import List, Optional, Dict, Any, Tuple
-import logging
+from base.logger import logger
 import subprocess
 from pathlib import Path
 
@@ -22,7 +22,7 @@ from .graph import app as graph_app
 from .commands.debug_commands import debug_cli
 
 # Imports for types and core functionality - these are relative to src/
-from core.plugin_creator import create_plugin
+from base.plugin_creator import create_plugin
 from runner import CapGateRunner
 from db.schemas.interface import Interface
 

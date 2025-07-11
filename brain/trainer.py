@@ -4,7 +4,7 @@ import json
 import os
 import csv
 from typing import List, Optional
-from core.logger import logger
+from base.logger import logger
 
 
 def jsonl_to_csv(jsonl_path: str, csv_path: Optional[str] = None, fields: Optional[List[str]] = None):

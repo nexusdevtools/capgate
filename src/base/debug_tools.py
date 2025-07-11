@@ -5,8 +5,8 @@ from rich.pretty import pprint
 from typing import Any, Optional # Import Optional
 
 # Assuming these are the correct imports for your state management
-from core.state_management.context import CapGateContext
-from core.state_management.state import AppState
+from base.state_management.context import CapGateContext
+from base.state_management.state import AppState
 
 console = Console()
 

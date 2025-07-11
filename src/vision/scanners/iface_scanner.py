@@ -6,8 +6,8 @@ import time
 from typing import Optional, Dict, Any, List, Tuple
 import re
 
-from core.logger import logger
-from core.state_management.state import AppState
+from base.logger import logger
+from base.state_management.state import AppState
 from db.schemas.interface import Interface
 
 

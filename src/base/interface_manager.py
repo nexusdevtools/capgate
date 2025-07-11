@@ -2,9 +2,9 @@
 
 from typing import List, Optional
 
-from core.logger import logger
+from base.logger import logger
 # Import the global AppState directly
-from core.state_management.state import AppState, get_state
+from base.state_management.state import AppState, get_state
 # Import the official Interface schema
 from db.schemas.interface import Interface
 
@@ -95,9 +95,9 @@ if __name__ == "__main__":
     # In a standalone run, initialize the AppState and trigger the scan
     # It's crucial that iface_scanner.py also has its __main__ block removed
     # or updated to not run automatically when imported.
-    from core.state_management.state import get_state
+    from base.state_management.state import get_state
     from vision.scanners.iface_scanner import scan_interfaces_and_update_state
-    from core.debug_tools import dump_app_state # Assuming this exists
+    from base.debug_tools import dump_app_state # Assuming this exists
 
     test_app_state = get_state()
     

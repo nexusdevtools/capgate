@@ -3,10 +3,10 @@
 # Removed subprocess and re imports as discovery logic is moved
 # Removed time import as last_seen is handled by scanners/runner
 # from core.debug_tools import debug_var, dump_context, print_exception # These are generally useful for plugins
-from core.logger import logger
-from core.state_management.context import CapGateContext # Import CapGateContext, not AppContext
+from base.logger import logger
+from base.state_management.context import CapGateContext # Import CapGateContext, not AppContext
 # Removed AppContext import as CapGateContext is the new entry point
-from core.graphs.topology import TopologyGraph
+from base.graphs.topology import TopologyGraph
 # Removed db.schemas.device.Device as device injection is moved
 # Removed parse_arp_table as discovery is moved
 # Removed inject_devices_into_context as device injection is moved
@@ -63,7 +63,7 @@ def run(app_context: CapGateContext, *plugin_args: str):
         logger.info("✅ el_topo: Topology visualization completed.")
     except Exception as e:
         # Using print_exception from core.debug_tools for consistent error logging
-        from core.debug_tools import print_exception
+        from base.debug_tools import print_exception
         print_exception(e, "An error occurred during el_topo plugin execution") # Pass message
         logger.error(f"❌ el_topo: Plugin execution failed: {e}")
         return False

@@ -10,9 +10,9 @@ import time
 import re
 from typing import Optional, Tuple, List, Dict, Any
 
-from core.logger import logger
+from base.logger import logger
 from helpers import shelltools
-from core.state_management.state import AppState
+from base.state_management.state import AppState
 from db.schemas.interface import Interface # Import Interface schema
 
 

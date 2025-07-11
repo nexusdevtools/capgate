@@ -10,16 +10,16 @@ import threading
 from typing import Dict, Any, Optional, List, Callable, Tuple, Union, cast
 
 from db.schemas.interface import Interface
-from core.logger import logger
-from core.state_management.context import CapGateContext
-from core.state_management.state import AppState
-from core.interface_controller import InterfaceController
-from core.ap_manager import APManager
-from core.dhcp_dns_manager import DhcpDnsManager
-from core.traffic_redirector import TrafficRedirector
-from core.web_server_manager import WebServerManager
-from core.credential_verifier import CredentialVerifier
-from core.network_scanner import NetworkScanner
+from base.logger import logger
+from base.state_management.context import CapGateContext
+from base.state_management.state import AppState
+from base.interface_controller import InterfaceController
+from base.ap_manager import APManager
+from base.dhcp_dns_manager import DhcpDnsManager
+from base.traffic_redirector import TrafficRedirector
+from base.web_server_manager import WebServerManager
+from base.credential_verifier import CredentialVerifier
+from base.network_scanner import NetworkScanner
 
 from paths import CAPGATE_CREDENTIALS_FILE
 from helpers import shelltools
@@ -625,7 +625,7 @@ def run(app_context: CapGateContext, *plugin_args: str):
             logger.warning("[PLUGIN EvilTwin] Attack finished without full success.")
 
     except Exception as e:
-        from core.debug_tools import print_exception
+        from base.debug_tools import print_exception
         print_exception(e, "[PLUGIN EvilTwin] An unexpected error occurred during attack execution")
         logger.error("[PLUGIN EvilTwin] Attack failed due to an unexpected error: %s", e)
         return False

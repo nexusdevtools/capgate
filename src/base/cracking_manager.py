@@ -11,7 +11,7 @@ import tempfile
 import shlex
 from typing import Optional, List
 
-from core.logger import logger
+from base.logger import logger
 from helpers import shelltools
 # CRITICAL FIX: Import the paths module to get the WORDLISTS_DIR
 from paths import WORDLISTS_DIR
